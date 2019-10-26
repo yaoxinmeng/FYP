@@ -18,7 +18,7 @@ for subdir, dirs, files in os.walk(data_path):
         data = cv2.imread(filename)
         # get label from path
         filename = os.path.join(label_path, file)
-        label = cv2.imread(filename)
+        label = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
 
         # augment data
         # flip horizontally
@@ -65,6 +65,23 @@ for subdir, dirs, files in os.walk(data_path):
         if count % 1000 == 0:
             print('Finished', count, 'images')
 
-data_list = np.array(data_list)
-label_list = np.array(label_list)
-np.savez('outfile', data=data_list, label=label_list)
+SPLIT = 0.7
+# split x and y into train and test sets
+split_point = int(len(data_list) * SPLIT)
+train_x = data_list[0 : split_point]
+train_y = label_list[0 : split_point]
+test_x = data_list[split_point+1 : len(data_list)]
+test_y = label_list[split_point+1 : len(label_list)]
+
+# convert into array and reshape
+train_size = len(train_x)
+test_size = len(test_x)
+train_x = np.array(train_x)
+train_x.reshape(train_size, 256, 256, 3).astype('float32')
+train_y = np.array(train_y)
+train_y.reshape(train_size, 256, 256, 1).astype('float32')
+test_x = np.array(test_x)
+test_x.reshape(test_size, 256, 256, 3).astype('float32')
+test_y = np.array(test_y)
+test_y.reshape(test_size, 256, 256, 1).astype('float32')
+np.savez('labelled_data/outfile', train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)
