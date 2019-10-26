@@ -9,8 +9,10 @@ from PIL import Image, ImageDraw
 # color definitions
 white = (255, 255, 255)
 black = (0, 0, 0)
-grey = (80, 80, 80)
-light_grey = (169, 169, 169)
+grey_8 = (51, 51, 51)
+grey_4 = (153, 153, 153)
+grey_2 = (204, 204, 204)
+grey_1 = (230, 230, 230)
 red = (180, 0, 0)
 bright_red = (255, 0, 0)
 green = (0, 180, 0)
@@ -109,17 +111,25 @@ def draw_fuzzy(d, p0, p1):
     if abs(ver) < abs(hor):
         # more horizontal than vertical
         # create grey lines above and below original line
-        draw(d, p0, p1, (0, 1), grey, 1)
-        draw(d, p0, p1, (0, -1), grey, 1)
-        draw(d, p0, p1, (0, 2), light_grey, 1)
-        draw(d, p0, p1, (0, -2), light_grey, 1)
+        draw(d, p0, p1, (0, 1), grey_8, 1)
+        draw(d, p0, p1, (0, -1), grey_8, 1)
+        draw(d, p0, p1, (0, 2), grey_4, 1)
+        draw(d, p0, p1, (0, -2), grey_4, 1)
+        draw(d, p0, p1, (0, 3), grey_2, 1)
+        draw(d, p0, p1, (0, -3), grey_2, 1)
+        draw(d, p0, p1, (0, 4), grey_1, 1)
+        draw(d, p0, p1, (0, -4), grey_1, 1)
     else:
         # more vertical than horizontal
         # create grey lines left and right of original line
-        draw(d, p0, p1, (1, 0), grey, 1)
-        draw(d, p0, p1, (-1, 0), grey, 1)
-        draw(d, p0, p1, (2, 0), light_grey, 1)
-        draw(d, p0, p1, (-2, 0), light_grey, 1)
+        draw(d, p0, p1, (1, 0), grey_8, 1)
+        draw(d, p0, p1, (-1, 0), grey_8, 1)
+        draw(d, p0, p1, (2, 0), grey_4, 1)
+        draw(d, p0, p1, (-2, 0), grey_4, 1)
+        draw(d, p0, p1, (3, 0), grey_2, 1)
+        draw(d, p0, p1, (-3, 0), grey_2, 1)
+        draw(d, p0, p1, (4, 0), grey_1, 1)
+        draw(d, p0, p1, (-4, 0), grey_1, 1)
 
 
 def draw(d, p0, p1, v, fill, width):
@@ -247,4 +257,3 @@ while True:
         button("QUIT", 210, 10, 80, 50, red, bright_red, quit_program)
         # Draws the surface object to the screen.
         pygame.display.update()
-

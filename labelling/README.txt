@@ -9,3 +9,6 @@ STEPS TO TAKE
 
 3. Run "python augmentation.py"
    This is done after all data has been labelled and will generate 4x the original number of images
+
+4. Run "python train_model.py"
+   This trains the model based on files in the labelled_data directory
