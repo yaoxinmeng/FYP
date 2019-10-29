@@ -173,7 +173,7 @@ def save_image():
     img_path = os.path.join(output_path_data, file_name)
     cv2.imwrite(img_path, new_img)
     img_path = os.path.join(output_path_history, file_name)
-    cv2,imwrite(img_path, img)
+    cv2.imwrite(img_path, img)
 
     # DELETE IMAGE FROM input_path FOLDER
     os.remove(image)
