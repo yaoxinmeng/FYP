@@ -113,21 +113,21 @@ def main():
     model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     history = model.fit(train_dataset, validation_data=test_dataset, epochs=20)  # validate using test data
-    #
-    # # Get stats from history object
-    # history_dict = history.history
-    # print(history_dict.keys())    # get keys for history object
-    # acc = history.history['accuracy']            # Train data accuracy
-    # val_acc = history.history['val_accuracy']    # Test data accuracy
-    # epochs = range(len(acc))
-    #
-    # # Plot accuracy vs epochs
-    # plt.title('Training and validation accuracy')
-    # plt.plot(epochs, acc, color='blue', label='Train')
-    # plt.plot(epochs, val_acc, color='red', label='Test')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Accuracy')
-    # plt.legend()
+
+    # Get stats from history object
+    history_dict = history.history
+    print(history_dict.keys())    # get keys for history object
+    acc = history.history['accuracy']            # Train data accuracy
+    val_acc = history.history['val_accuracy']    # Test data accuracy
+    epochs = range(len(acc))
+
+    # Plot accuracy vs epochs
+    plt.title('Training and validation accuracy')
+    plt.plot(epochs, acc, color='blue', label='Train')
+    plt.plot(epochs, val_acc, color='red', label='Test')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
 
 
 if __name__ == '__main__' :

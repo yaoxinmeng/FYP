@@ -6,8 +6,18 @@ import numpy as np
 data_path = 'labelled_data/data'
 label_path = 'labelled_data/label'
 
+# get biggest filename in data_path
+count = 0
+for subdir, dirs, files in os.walk(data_path):
+    for file in files:
+        temp = file.split('.')
+        temp = int(temp[0])
+        if temp > count:
+            count = temp
+count = count + 1
+
+
 # global variables
-count = len(os.listdir(data_path))
 data_list = []
 label_list = []
 for subdir, dirs, files in os.walk(data_path):

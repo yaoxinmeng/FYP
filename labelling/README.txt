@@ -12,3 +12,6 @@ STEPS TO TAKE
 
 4. Run "python train_model.py"
    This trains the model based on files in the labelled_data directory
+
+5. Upload the generated "outfile.npz" to dropbox/public
+   Update the colab link if necessary

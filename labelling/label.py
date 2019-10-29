@@ -29,6 +29,7 @@ image_len = 512  # image is 512 x 512
 input_path = 'cleaned_data'
 output_path_data = 'labelled_data/data'
 output_path_label = 'labelled_data/label'
+output_path_history = 'labelled_data/history'
 
 # global variables
 first_click = True
@@ -171,6 +172,8 @@ def save_image():
     file_name = os.path.split(image)[1]
     img_path = os.path.join(output_path_data, file_name)
     cv2.imwrite(img_path, new_img)
+    img_path = os.path.join(output_path_history, file_name)
+    cv2,imwrite(img_path, img)
 
     # DELETE IMAGE FROM input_path FOLDER
     os.remove(image)
