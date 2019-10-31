@@ -87,7 +87,7 @@ def done():
     # set and load next image
     set_next_image()
     reset_display(display_surface)
-    pygame.time.wait(15)  # 15ms delay to debounce
+    pygame.time.wait(200)  # 15ms delay to debounce
 
 
 def draw_lines():
@@ -184,7 +184,7 @@ def undo():
     if len(line_list) != 0:
         line_list.pop()
         redraw_lines()
-        pygame.time.wait(15)  # 15ms delay to debounce
+        pygame.time.wait(200)  # 15ms delay to debounce
 
 
 # redraw all lines up till undo
