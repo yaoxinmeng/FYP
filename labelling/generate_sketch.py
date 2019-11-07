@@ -5,70 +5,62 @@ import argparse
 
 # threshold value for pixel to qualify as a label
 threshold = 0.8
+parallel = 0.95
 
 # extract file as array
 def read_file(file):
-    label = cv2.imread(file)
-    
+    # Comment out this section as necessary
+    ################################################
+    label = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
+    label = np.array(label)
+    label.reshape(train_size, 256, 256, 1).astype('float32')
+    label =  label/ 255.0
+    ################################################
+    for points in label:
+        if points <= threshold:
+            points = 0
+        else:
+            points = 1
+    return label
 
 
-# global variables
-data_list = []
-label_list = []
-for subdir, dirs, files in os.walk(data_path):
-    for file in files:
-        # read data and labels
-        # get image from path given
-        filename = os.path.join(data_path, file)
-        data = cv2.imread(filename)
-        # get label from path
-        filename = os.path.join(label_path, file)
-        label = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+# determine if two vectors are roughly parallel
+def isparallel(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    dot = np.dot(a, b)
+    if dot > parallel || dot < -parallel:
+        return 1
+    else:
+        return 0
 
-        # augment data
-        # flip horizontally
-        flipped_data = cv2.flip(data, 1)
-        flipped_label = cv2.flip(label, 1)
-        # brighten image (no need to augment label)
-        bright_data = cv2.convertScaleAbs(data, alpha=1, beta=50)
-        # flip + brighten image
-        flipped_bright_data = cv2.convertScaleAbs(flipped_data, alpha=1, beta=50)
 
-        # write to output path
-        # write flipped images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, flipped_data)
-        cv2.imwrite(out_label_path, flipped_label)
-        count += 1
-        # write brightened images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, bright_data)
-        cv2.imwrite(out_label_path, label)
-        count += 1
-        # write flipped + brightened images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, flipped_bright_data)
-        cv2.imwrite(out_label_path, flipped_label)
-        count += 1
+# count the number of tagged pixels around a given pixel
+def neighbours(array, x, y):
+    count = 0
+    for u in range(x-1, x+2):
+        for v in range(y-1, y+2):
+            if array[u][v] == 1 && u!= x && v != y:
+                count = count + 1
+    return count
 
-        # Add to list
-        data_list.append(data)
-        data_list.append(flipped_data)
-        data_list.append(bright_data)
-        data_list.append(flipped_bright_data)
-        label_list.append(label)
-        label_list.append(flipped_label)
-        label_list.append(label)
-        label_list.append(flipped_label)
 
-        if count % 1000 == 0:
-            print('Finished', count, 'images')
+def keypoints(array):
+    points = []
+    line_array = np.zeros(256, 256)
+    for x in range(0, 255):
+        for y in range(0, 255):
+            if array[x][y] == 1 && line[x][y] != 1:
+                # add as endpoint to points list
+                points = points.append(tuple((x,y)))
+                # mark out all other points that form the line in line_array
+                line_array = trace (array, x, y)
+    return points
+
+
+def trace(array, x, y):
+    if neighbours(array, x, y) != 1:
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str, help='Name of input label file')
