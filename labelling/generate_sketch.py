@@ -5,7 +5,12 @@ import argparse
 
 # threshold value for pixel to qualify as a label
 threshold = 0.8
-parallel = 0.95
+# Hough Transform parameters
+minLineLength = 20
+maxLineGap = 5
+rho = 1
+theta = np.pi/180
+houghthreshold = 15
 
 # extract file as array
 def read_file(file):
@@ -13,57 +18,37 @@ def read_file(file):
     ################################################
     label = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
     label = np.array(label)
-    label.reshape(train_size, 256, 256, 1).astype('float32')
+    #label.reshape(256, 256, 1).astype('float32')
     label =  label/ 255.0
     ################################################
     for points in label:
-        if points <= threshold:
-            points = 0
-        else:
-            points = 1
-    return label
+        for point in points:
+            if point <= threshold:
+                point = 0
+            else:
+                point = 1
+    cv2.imshow('label', label)
+    cv2.waitKey(0)
+    return label * 255.0
 
 
-# determine if two vectors are roughly parallel
-def isparallel(a, b):
-    a = np.array(a)
-    b = np.array(b)
-    dot = np.dot(a, b)
-    if dot > parallel || dot < -parallel:
-        return 1
-    else:
-        return 0
-
-
-# count the number of tagged pixels around a given pixel
-def neighbours(array, x, y):
-    count = 0
-    for u in range(x-1, x+2):
-        for v in range(y-1, y+2):
-            if array[u][v] == 1 && u!= x && v != y:
-                count = count + 1
-    return count
-
-
-def keypoints(array):
-    points = []
-    line_array = np.zeros(256, 256)
-    for x in range(0, 255):
-        for y in range(0, 255):
-            if array[x][y] == 1 && line[x][y] != 1:
-                # add as endpoint to points list
-                points = points.append(tuple((x,y)))
-                # mark out all other points that form the line in line_array
-                line_array = trace (array, x, y)
-    return points
-
-
-def trace(array, x, y):
-    if neighbours(array, x, y) != 1:
+def houghtransform(label):
+    img = np.copy(label)*0 + 255
+    edges = cv2.Canny(label, 50, 150, apertureSize = 3, L2gradient=True)
+    lines = cv2.HoughLinesP(edges, rho, theta, houghthreshold, minLineLength, maxLineGap)
+    if lines.any():
+        for line in lines:
+            for x1,y1,x2,y2 in line:
+                cv2.line(img,(x1,y1),(x2,y2),(0,255,0),2)
+    cv2.imshow('canny', edges)
+    cv2.imshow('hough', img)
+    cv2.waitKey(0)
+    cv2.imwrite('houghlines5.jpg',img)
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str, help='Name of input label file')
 args = parser.parse_args()
 
-read_file(args.filename)
+label = read_file(args.filename)
+houghtransform(label)
