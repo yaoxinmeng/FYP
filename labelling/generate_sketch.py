@@ -32,7 +32,8 @@ def read_file(file):
     return label * 255.0
 
 
-def houghtransform(label):
+def houghtransform(file):
+    label = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
     img = np.copy(label)*0 + 255
     edges = cv2.Canny(label, 50, 150, apertureSize = 3, L2gradient=True)
     lines = cv2.HoughLinesP(edges, rho, theta, houghthreshold, minLineLength, maxLineGap)
@@ -50,5 +51,5 @@ parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str, help='Name of input label file')
 args = parser.parse_args()
 
-label = read_file(args.filename)
-houghtransform(label)
+#label = read_file(args.filename)
+houghtransform(args.filename)
