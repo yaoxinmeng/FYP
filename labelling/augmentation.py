@@ -1,10 +1,17 @@
 import cv2
 import os
 import numpy as np
+import argparse
+
+# input argument
+parser = argparse.ArgumentParser()
+parser.add_argument('pathname', type=str, help='Name of labelled data directory')
+args = parser.parse_args()
 
 # paths
-data_path = 'labelled_data/data'
-label_path = 'labelled_data/label'
+data_path = os.path.join(args.pathname, 'data')
+label_path = os.path.join(args.pathname, 'label')
+npzfile = os.path.join(args.pathname, 'outfile')
 
 # get biggest filename in data_path
 count = 0
@@ -17,9 +24,11 @@ for subdir, dirs, files in os.walk(data_path):
 count = count + 1
 
 
-# global variables
+# list of files
 data_list = []
 label_list = []
+
+# augment data and labels in directory
 for subdir, dirs, files in os.walk(data_path):
     for file in files:
         # read data and labels
@@ -46,21 +55,20 @@ for subdir, dirs, files in os.walk(data_path):
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, flipped_data)
         cv2.imwrite(out_label_path, flipped_label)
-        count += 1
+
         # write brightened images
         out_filename = str(count) + '.jpg'
         out_data_path = os.path.join(data_path, out_filename)
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, bright_data)
         cv2.imwrite(out_label_path, label)
-        count += 1
+
         # write flipped + brightened images
         out_filename = str(count) + '.jpg'
         out_data_path = os.path.join(data_path, out_filename)
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, flipped_bright_data)
         cv2.imwrite(out_label_path, flipped_label)
-        count += 1
 
         # Add to list
         data_list.append(data)
@@ -72,11 +80,12 @@ for subdir, dirs, files in os.walk(data_path):
         label_list.append(label)
         label_list.append(flipped_label)
 
+        count += 1
         if count % 1000 == 0:
             print('Finished', count, 'images')
 
-SPLIT = 0.7
 # split x and y into train and test sets
+SPLIT = 0.7
 split_point = int(len(data_list) * SPLIT)
 train_x = data_list[0 : split_point]
 train_y = label_list[0 : split_point]
@@ -94,4 +103,6 @@ test_x = np.array(test_x)
 test_x.reshape(test_size, 256, 256, 3).astype('float32')
 test_y = np.array(test_y)
 test_y.reshape(test_size, 256, 256, 1).astype('float32')
-np.savez('labelled_data/outfile', train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)
+
+# save as npz file
+np.savez(npzfile, train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)

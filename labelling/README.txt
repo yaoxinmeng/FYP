@@ -7,8 +7,9 @@ STEPS TO TAKE
 2. Run "python label.py"
    This is for labelling the data from cleaned_data and saves output to labelled_data
 
-3. Run "python augmentation.py"
-   This is done after all data has been labelled and will generate 4x the original number of images
+3. Run "python augmentation.py labelled_data_folder"
+   This is done after all data has been labelled and will generate 4x the original number of images, 
+   as well as a .npz file
 
 4. Run "python train_model.py"
    This trains the model based on files in the labelled_data directory
