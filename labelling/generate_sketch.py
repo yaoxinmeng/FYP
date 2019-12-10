@@ -12,7 +12,7 @@ rho = 1
 theta = np.pi/180
 houghthreshold = 15
 
-# extract file as array
+# extract file as array and manipulate array data
 def read_file(file):
     # Comment out this section as necessary
     ################################################
@@ -33,6 +33,7 @@ def read_file(file):
     return np.uint8(label * 255.0)
 
 
+# apply Hough Transform on processed label
 def houghtransform(label):
     img = np.copy(label)*0 + 255
     lines = cv2.HoughLinesP(label, rho, theta, houghthreshold, minLineLength, maxLineGap)
@@ -44,6 +45,27 @@ def houghtransform(label):
     cv2.imshow('hough', img)
     cv2.waitKey(0)
     cv2.imwrite('houghlines5.jpg',img)
+
+
+# get equations of each line in image and attempt to join them
+# polar equation of line is rho = d/(cos(theta-beta)), where
+# a point on the line is (rho, theta)
+def getLines(label):
+    d_range = int(sqrt(2)*256)
+    beta_range = 360
+    param = np.zeros((d_range, beta_range))
+    with np.nditer(param, op_flags=['readwrite']) as temp:
+        for x in range(256):
+            for y in range(256):
+                rho = sqrt(x*x + y*y)
+                theta = arctan(y/x)
+                for d in range(d_range):
+                    for beta in range(beta_range):
+                        beta_rad = beta/180 * np.pi
+                        match = d / (rho * cos(theta - beta_rad))
+                        if match >= 0.99:
+                            temp[d, beta] = temp[d, beta] + 1
+    
 
 
 parser = argparse.ArgumentParser()
