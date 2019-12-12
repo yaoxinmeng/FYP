@@ -44,7 +44,6 @@ def houghtransform(label):
     cv2.imshow('edges', label)
     cv2.imshow('hough', img)
     cv2.waitKey(0)
-    cv2.imwrite('houghlines5.jpg',img)
 
 
 # get equations of each line in image and attempt to join them
@@ -65,7 +64,7 @@ def getLines(label):
                         match = d / (rho * cos(theta - beta_rad))
                         if match >= 0.99:
                             temp[d, beta] = temp[d, beta] + 1
-    
+
 
 
 parser = argparse.ArgumentParser()
