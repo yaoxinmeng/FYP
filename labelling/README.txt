@@ -16,3 +16,6 @@ STEPS TO TAKE
 
 5. Upload the generated "outfile.npz" to dropbox/public
    Update the colab link if necessary
+
+6. Run "python generate_sketch.py file_name" 
+   This generates line equations from label files
