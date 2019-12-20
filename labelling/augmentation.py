@@ -2,6 +2,7 @@ import cv2
 import os
 import numpy as np
 import argparse
+import h5py
 
 # input argument
 parser = argparse.ArgumentParser()
@@ -14,6 +15,7 @@ label_path = os.path.join(args.pathname, 'label')
 npzfile = os.path.join(args.pathname, 'outfile')
 
 # get biggest filename in data_path
+print('Starting...')
 count = 0
 for subdir, dirs, files in os.walk(data_path):
     for file in files:
@@ -22,7 +24,7 @@ for subdir, dirs, files in os.walk(data_path):
         if temp > count:
             count = temp
 count = count + 1
-
+max = count
 
 # list of files
 data_list = []
@@ -55,6 +57,7 @@ for subdir, dirs, files in os.walk(data_path):
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, flipped_data)
         cv2.imwrite(out_label_path, flipped_label)
+        count += 1
 
         # write brightened images
         out_filename = str(count) + '.jpg'
@@ -62,6 +65,7 @@ for subdir, dirs, files in os.walk(data_path):
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, bright_data)
         cv2.imwrite(out_label_path, label)
+        count += 1
 
         # write flipped + brightened images
         out_filename = str(count) + '.jpg'
@@ -69,6 +73,7 @@ for subdir, dirs, files in os.walk(data_path):
         out_label_path = os.path.join(label_path, out_filename)
         cv2.imwrite(out_data_path, flipped_bright_data)
         cv2.imwrite(out_label_path, flipped_label)
+        count += 1
 
         # Add to list
         data_list.append(data)
@@ -80,9 +85,7 @@ for subdir, dirs, files in os.walk(data_path):
         label_list.append(label)
         label_list.append(flipped_label)
 
-        count += 1
-        if count % 1000 == 0:
-            print('Finished', count, 'images')
+        print('Finished', count-max, 'images')
 
 # split x and y into train and test sets
 SPLIT = 0.7
@@ -96,13 +99,22 @@ test_y = label_list[split_point+1 : len(label_list)]
 train_size = len(train_x)
 test_size = len(test_x)
 train_x = np.array(train_x)
-train_x.reshape(train_size, 256, 256, 3).astype('float32')
+train_x.reshape(train_size, 256, 256, 3).astype('uint8')
 train_y = np.array(train_y)
-train_y.reshape(train_size, 256, 256, 1).astype('float32')
+train_y.reshape(train_size, 256, 256, 1).astype('uint8')
 test_x = np.array(test_x)
-test_x.reshape(test_size, 256, 256, 3).astype('float32')
+test_x.reshape(test_size, 256, 256, 3).astype('uint8')
 test_y = np.array(test_y)
-test_y.reshape(test_size, 256, 256, 1).astype('float32')
+test_y.reshape(test_size, 256, 256, 1).astype('uint8')
 
+# save
+print('Saving file...')
+# save as hdf5 file
+f = h5py.File("output.hdf5", "w")
+train_images = f.create_dataset("train_images", data = train_x, compression="gzip")
+train_labels = f.create_dataset("train_labels", data = train_y, compression="gzip")
+test_images = f.create_dataset("test_images", data = test_x, compression="gzip")
+test_labels = f.create_dataset("test_labels", data = test_y, compression="gzip")
+f.close()
 # save as npz file
-np.savez(npzfile, train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)
+#np.savez(npzfile, train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)
