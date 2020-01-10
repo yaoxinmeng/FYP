@@ -36,6 +36,7 @@ first_click = True
 line = np.zeros((2, 2))
 line_list = []
 image = ''
+motion_count = 0
 
 
 # create a blank img
@@ -248,8 +249,19 @@ while True:
                 else:
                     line[1] = (x, y)
                     line_list.append(line.astype(int))
+                    redraw_lines()
                     pygame.draw.line(display_surface, black, line_list[-1][0], line_list[-1][1], 1)
                     first_click = True
+
+        if event.type == pygame.MOUSEMOTION:
+            # runs every 3rd motion
+            motion_count += 1
+            if motion_count > 3:
+                motion_count = 0
+                x, y = event.pos
+                if not first_click:
+                    redraw_lines()
+                    pygame.draw.line(display_surface, black, line[0], (x, y), 1)
 
         # if event object type is QUIT then quit both pygame and program
         if event.type == pygame.QUIT:
