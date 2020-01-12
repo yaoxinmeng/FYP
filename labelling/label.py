@@ -258,6 +258,13 @@ while True:
                 redraw_lines()
                 pygame.draw.line(display_surface, black, line[0], (x, y), 1)
 
+        if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            if first_click:
+                undo()
+            else:
+                first_click = True
+                redraw_lines()
+
         # if event object type is QUIT then quit both pygame and program
         if event.type == pygame.QUIT:
             quit_program()
