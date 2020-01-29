@@ -96,6 +96,7 @@ test_x = data_list[split_point+1 : len(data_list)]
 test_y = label_list[split_point+1 : len(label_list)]
 
 # convert into array and reshape
+print('Converting to array...')
 train_size = len(train_x)
 test_size = len(test_x)
 train_x = np.array(train_x)
