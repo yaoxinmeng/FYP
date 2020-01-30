@@ -34,79 +34,79 @@ class Net(nn.Module):
         # Input of 3 x 256 x 256, output of 64 x 256 x 256
         self.encode1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(64),
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(64),
         )
 
         # Input of 64 x 256 x 256, output of 128 x 128 x 128
         self.encode2 = nn.Sequential(
             nn.MaxPool2d(2),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(128),
             nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(128),
         )
 
         # Input of 128 x 128 x 128, output of 256 x 64 x 64
         self.encode3 = nn.Sequential(
             nn.MaxPool2d(2),
             nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(256),
             nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(256),
         )
-        
+
         # Input of 256 x 64 x 64, output of 512 x 32 x 32
         self.encode4 = nn.Sequential(
             nn.MaxPool2d(2),
             nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(512),
             nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(512),
         )
-        
+
         # Input of 512 x 32 x 32, output of 256 x 64 x 64
         self.decode4 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        
+
         # Input of 512 x 64 x 64, output of 128 x 128 x 128
         self.decode3 = nn.Sequential(
             nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(256),
             nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(256),
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
         )
-        
+
         # Input of 256 x 128 x 128, output of 64 x 256 x 256
         self.decode2 = nn.Sequential(
             nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(128),
             nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(128),
             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
         )
 
         # Input of 128 x 256 x 256, output of 2 x 256 x 256
         self.decode1 = nn.Sequential(
             nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(64),
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.LeakyReLU(),
+            nn.BatchNorm2d(64),
             nn.Conv2d(64, 2, kernel_size=1, stride=1)
         )
 
@@ -173,7 +173,7 @@ def accuracy(pred, true):
             if pred[x][y] == true[x][y]:
                 sum += 1
     return sum/(256*256)
-    
+
 
 # Train mode
 if args.mode == 'train':
@@ -215,7 +215,7 @@ if args.mode == 'train':
     criterion = nn.CrossEntropyLoss()
     criterion = criterion.cuda()
     summary(model, (3, 256, 256))
-    
+
     # empty list to store training and validation losses
     train_losses = []
     val_losses = []
@@ -261,13 +261,13 @@ if args.mode == 'train':
 
     # save model
     torch.save(model.state_dict(), PATH)
-    
+
     # plotting the training and validation loss
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
     plt.legend()
     plt.show()
- 
+
 
 # Test mode
 if args.mode == 'test':
@@ -277,21 +277,21 @@ if args.mode == 'test':
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
-    
+
     # generate dataset
     val_x = torch.from_numpy(test_images)
     val_x = val_x.view(-1, 3, 256, 256)
     val_y = torch.from_numpy(test_labels)
     val_y = val_y.view(-1, 256, 256)
+    print(val_x.shape, val_x.type)
     testset = torch.utils.data.TensorDataset(val_x, val_y)
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-    
+
     # Load model
     model = Net()
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
     summary(model, (3, 256, 256))
-    
+
     # visualise sample test data
     show_predictions(testloader, 5)
- 
