@@ -6,8 +6,6 @@ import argparse
 # PyTorch libraries and modules
 import torch
 from torch.autograd import Variable
-from torchvision import models
-import torchvision.transforms as T
 from torch import nn, optim
 from torchsummary import summary
 
@@ -24,27 +22,129 @@ if args.mode == 'test':
 
 # global variables
 filename = 'output.hdf5'    # data array
-BATCH_SIZE = 10              # batch size
-n_epochs = 20               # number of epochs
-PATH = 'my_model_trf.pt'        # path of saved model
-dim = 224                   # dimension of images
+BATCH_SIZE = 1              # batch size
+n_epochs = 50               # number of epochs
+PATH = 'my_model_u.pt'        # path of saved model
 
 
-# Model definition
-model = models.segmentation.fcn_resnet101(pretrained=True)
-for param in model.parameters():
-    param.requires_grad = False
-model.classifier[4] = nn.Sequential(
-    nn.Conv2d(512, 64, kernel_size=1, stride=1),
-    nn.BatchNorm2d(64),
-    nn.ReLU(),
-    nn.Dropout(0.1),
-    nn.Conv2d(64, 2, kernel_size=1, stride=1),
-)
-model.aux_classifier = nn.Identity()
-print(model)
+# encoder submodel definition
+class Conv(nn.Module):
+    def __init__(self, C_in, C_out):
+        super(Conv, self).__init__()
+        
+        self.conv = nn.Sequential(
+            nn.Conv2d(C_in, C_out, kernel_size=3, stride=1, padding=1),
+            nn.Dropout2d(0.3),
+            nn.BatchNorm2d(C_out),
+            nn.LeakyReLU(),
+            nn.Conv2d(C_out, C_out, kernel_size=3, stride=1, padding=1),
+            nn.Dropout2d(0.3),
+            nn.BatchNorm2d(C_out),
+            nn.LeakyReLU(),
+        )
+    
+    # Defining the forward pass
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+        
+        
+# model definition
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        
+        # Input of 3 x 256 x 256, output of 64 x 256 x 256
+        self.encode1 = Conv(3, 64)
+        
+        # Input of 64 x 256 x 256, output of 128 x 128 x 128
+        self.encode2 = nn.Sequential(
+            nn.MaxPool2d(2),
+            Conv(64, 128)
+        )
 
+        # Input of 128 x 128 x 128, output of 256 x 64 x 64
+        self.encode3 = nn.Sequential(
+            nn.MaxPool2d(2),
+            Conv(128, 256)
+        )
+        
+        # Input of 256 x 64 x 64, output of 512 x 32 x 32
+        self.encode4 = nn.Sequential(
+            nn.MaxPool2d(2),
+            Conv(256, 512)
+        )
+        
+        # Input of 512 x 32 x 32, output of 256 x 64 x 64
+        self.decode4 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        
+        # Input of 512 x 64 x 64, output of 128 x 128 x 128
+        self.decode3 = nn.Sequential(
+            Conv(512, 256),
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        )
+        
+        # Input of 256 x 128 x 128, output of 64 x 256 x 256
+        self.decode2 = nn.Sequential(
+            Conv(256, 128),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        )
 
+        # Input of 128 x 256 x 256, output of 2 x 256 x 256
+        self.decode1 = nn.Sequential(
+            Conv(128, 64),
+            nn.Conv2d(64, 2, kernel_size=1, stride=1)
+        )
+
+    # Defining the forward pass
+    def forward(self, x):
+        x = self.encode1(x)
+        x1 = x.clone()
+        x = self.encode2(x)
+        x2 = x.clone()
+        x = self.encode3(x)
+        x3 = x.clone()
+        x = self.encode4(x)
+        x = self.decode4(x)
+        x = torch.cat((x3, x), 1)
+        x = self.decode3(x)
+        x = torch.cat((x2, x), 1)
+        x = self.decode2(x)
+        x = torch.cat((x1, x), 1)
+        x = self.decode1(x)
+        return x
+    
+    # Show the filters from each layer
+    def visualize_features(self, x):
+        plt.figure(1)
+        plt.imshow(x[0].permute(1, 2, 0))
+        x = self.encode1(x)
+        for i in range(64):
+            plt.figure(2)
+            plt.subplot(8, 8, i+1)
+            plt.imshow(x[0,i,:,:].to(torch.device("cpu")).numpy())
+            plt.axis('off')
+        x = self.encode2(x)
+        for i in range(128):
+            plt.figure(3)
+            plt.subplot(8, 16, i+1)
+            plt.imshow(x[0,i,:,:].to(torch.device("cpu")).numpy())
+            plt.axis('off')
+        x = self.encode3(x)
+        for i in range(256):
+            plt.figure(4)
+            plt.subplot(16, 16, i+1)
+            plt.imshow(x[0,i,:,:].to(torch.device("cpu")).numpy())
+            plt.axis('off')
+        x = self.encode4(x)
+        for i in range(512):
+            plt.figure(5)
+            plt.subplot(16, 32, i+1)
+            plt.imshow(x[0,i,:,:].to(torch.device("cpu")).numpy())
+            plt.axis('off')
+        plt.show()
+
+    
 # Custom tensor dataset with support of transforms
 class CustomTensorDataset(torch.utils.data.Dataset):
     def __init__(self, arrays):
@@ -68,8 +168,8 @@ class CustomTensorDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.arrays[0].shape[0]
-
-
+        
+        
 # visual display of results
 def display(display_list):
     plt.figure(figsize=(15, 15))
@@ -86,7 +186,6 @@ def display(display_list):
 def create_mask(pred_mask):
     # the label assigned to the pixel is the channel with the highest value
     pred_mask = torch.argmax(pred_mask, dim=0)
-    pred_mask = pred_mask.numpy()
     return pred_mask
 
 
@@ -97,23 +196,20 @@ def show_predictions(dataset, num):
             break
         image, mask = data
         with torch.no_grad():
-            pred_mask = model(image.cuda())['out']
-        image = image.to(torch.device("cpu")).view(-1, dim, dim, 3)
-        mask = mask.to(torch.device("cpu")).view(-1, dim, dim)
-        pred_mask = pred_mask.to(torch.device("cpu"))
+            pred_mask = model(image.cuda())
         print(accuracy(pred_mask[0], mask[0]))
-        display([image[0].numpy(), mask[0].numpy(), create_mask(pred_mask[0])])
+        display([image[0].permute(1, 2, 0), mask[0], create_mask(pred_mask[0])])
 
 
 def accuracy(pred, true):
     sum = 0
     pred = create_mask(pred)
-    for x in range(dim):
-        for y in range(dim):
+    for x in range(256):
+        for y in range(256):
             if pred[x][y] == true[x][y]:
                 sum += 1
-    return sum/(dim*dim)
-
+    return sum/(256*256)
+    
 
 # Train mode
 if args.mode == 'train':
@@ -133,13 +229,30 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
+    
+    # # Visualize sample from dataset
+    # x, y = trainset[0]
+    # print(x.dtype, x.shape)
+    # print(y.dtype, y.shape)
+    # plt.subplot(1, 3, 1)
+    # plt.imshow(train_images[0])
+    # plt.subplot(1, 3, 2)
+    # plt.imshow(x.permute(1, 2, 0))
+    # plt.subplot(1, 3, 3)
+    # plt.imshow(y)
+    # plt.show()
+    # del x, y
 
     # defining the model
+    model = Net()
     model = model.cuda()
+    # defining the optimizer
+    optimizer = optim.Adam(model.parameters(), lr=0.07)
+    # defining the loss function
     criterion = nn.CrossEntropyLoss()
     criterion = criterion.cuda()
-    optimizer = optim.Adam(model.parameters())
-
+    summary(model, (3, 256, 256))
+    
     # empty list to store training and validation losses
     train_losses = []
     val_losses = []
@@ -157,12 +270,11 @@ if args.mode == 'train':
         loss_val = 0
         # computing the training loss batch-wise
         for inputs, labels in tqdm(trainloader):
-            inputs = Variable(inputs.cuda())
-            labels = Variable(labels.cuda().type(torch.cuda.LongTensor).view(-1, dim, dim))
+            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda().type(torch.cuda.LongTensor))
             # clearing the Gradients of the model parameters
             optimizer.zero_grad()
             # prediction for training and validation set
-            output_train = model(inputs)['out']
+            output_train = model(inputs)
             # computing the training and validation loss
             loss = criterion(output_train, labels) # compare the likelihood of a pixel being 1
             # computing the updated weights of all the model parameters
@@ -173,10 +285,9 @@ if args.mode == 'train':
 
         # computing the validation loss batch-wise
         for inputs, labels in tqdm(testloader):
-            inputs = inputs.cuda()
-            labels = labels.cuda().type(torch.cuda.LongTensor).view(-1, dim, dim)
+            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda().type(torch.cuda.LongTensor))
             with torch.no_grad():
-                output_val = model(inputs)['out']
+                output_val = model(inputs)
             loss_val += criterion(output_val, labels)
         loss_val = loss_val / (val_size/BATCH_SIZE)
 
@@ -187,13 +298,13 @@ if args.mode == 'train':
 
     # save model
     torch.save(model.state_dict(), PATH)
-
+    
     # plotting the training and validation loss
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
     plt.legend()
     plt.show()
-
+ 
 
 # Test mode
 if args.mode == 'test':
@@ -203,14 +314,24 @@ if args.mode == 'test':
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
-
+    
     # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-
+    
     # Load model
+    model = Net()
+    summary(model, (3, 256, 256))
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
-
+    
+    # visualise features
+    for i, data in enumerate(testloader, 0):
+        inputs, labels = data
+        with torch.no_grad():
+            model.visualize_features(inputs.cuda())
+        break
+    
     # visualise sample test data
     show_predictions(testloader, 5)
+    

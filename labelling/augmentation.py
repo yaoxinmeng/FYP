@@ -1,8 +1,14 @@
+# Creates a train and test set of type uint8
+# x has shape (-1 x 256 x 256 x 3), range [0, 255], type uint8
+# y has shape (-1 x 256 x 256), range [0, 1], type uint8
+
 import cv2
 import os
 import numpy as np
 import argparse
 import h5py
+from tqdm import tqdm
+
 
 # input argument
 parser = argparse.ArgumentParser()
@@ -12,25 +18,20 @@ args = parser.parse_args()
 # paths
 data_path = os.path.join(args.pathname, 'data')
 label_path = os.path.join(args.pathname, 'label')
-npzfile = os.path.join(args.pathname, 'outfile')
+outfile = 'output.hdf5'
 
-# get biggest filename in data_path
-print('Starting...')
-count = 0
+# count number of files
+length = 0
 for subdir, dirs, files in os.walk(data_path):
     for file in files:
-        temp = file.split('.')
-        temp = int(temp[0])
-        if temp > count:
-            count = temp
-count = count + 1
-max = count
+        length += 1
 
 # list of files
-data_list = []
-label_list = []
+data_list = np.zeros((4*length, 256, 256, 3), dtype='uint8')
+label_list = np.zeros((4*length, 256, 256), dtype='uint8')
 
 # augment data and labels in directory
+count = 0
 for subdir, dirs, files in os.walk(data_path):
     for file in files:
         # read data and labels
@@ -50,70 +51,44 @@ for subdir, dirs, files in os.walk(data_path):
         # flip + brighten image
         flipped_bright_data = cv2.convertScaleAbs(flipped_data, alpha=1, beta=50)
 
-        # write to output path
-        # write flipped images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, flipped_data)
-        cv2.imwrite(out_label_path, flipped_label)
+        data_list[4*count] = data
+        data_list[4*count+1] = flipped_data
+        data_list[4*count+2] = bright_data
+        data_list[4*count+3] = flipped_bright_data
+        label_list[4*count] = (label/255)
+        label_list[4*count+1] = (flipped_label/255)
+        label_list[4*count+2] = (label/255)
+        label_list[4*count+3] = (flipped_label/255)
+
         count += 1
+        if count%10 == 0:
+            print('Finished', count, 'images')
 
-        # write brightened images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, bright_data)
-        cv2.imwrite(out_label_path, label)
-        count += 1
-
-        # write flipped + brightened images
-        out_filename = str(count) + '.jpg'
-        out_data_path = os.path.join(data_path, out_filename)
-        out_label_path = os.path.join(label_path, out_filename)
-        cv2.imwrite(out_data_path, flipped_bright_data)
-        cv2.imwrite(out_label_path, flipped_label)
-        count += 1
-
-        # Add to list
-        data_list.append(data)
-        data_list.append(flipped_data)
-        data_list.append(bright_data)
-        data_list.append(flipped_bright_data)
-        label_list.append(label)
-        label_list.append(flipped_label)
-        label_list.append(label)
-        label_list.append(flipped_label)
-
-        print('Finished', count-max, 'images')
+print('Data', data_list.dtype, data_list.shape)
+print('Label', label_list.dtype, label_list.shape)
 
 # split x and y into train and test sets
+print('Performing train-test split...')
 SPLIT = 0.7
-split_point = int(len(data_list) * SPLIT)
+split_point = int(data_list.shape[0] * SPLIT)
 train_x = data_list[0 : split_point]
 train_y = label_list[0 : split_point]
-test_x = data_list[split_point+1 : len(data_list)]
-test_y = label_list[split_point+1 : len(label_list)]
+test_x = data_list[split_point+1 : data_list.shape[0]-1]
+test_y = label_list[split_point+1 : data_list.shape[0]-1]
+print(train_x.dtype, train_x.shape)
+print(train_y.dtype, train_y.shape)
+print(test_x.dtype, test_x.shape)
+print(test_y.dtype, test_y.shape)
 
-# convert into array and reshape
-print('Converting to array...')
-train_size = len(train_x)
-test_size = len(test_x)
-train_x = np.array(train_x)
-train_x.reshape(train_size, 256, 256, 3).astype('uint8')
-train_y = np.array(train_y)
-train_y.reshape(train_size, 256, 256, 1).astype('uint8')
-test_x = np.array(test_x)
-test_x.reshape(test_size, 256, 256, 3).astype('uint8')
-test_y = np.array(test_y)
-test_y.reshape(test_size, 256, 256, 1).astype('uint8')
 
 # save
 print('Saving file...')
 # save as hdf5 file
-f = h5py.File("output.hdf5", "w")
+f = h5py.File(outfile, "w")
+print('Compressing train set...')
 train_images = f.create_dataset("train_images", data = train_x, compression="gzip")
 train_labels = f.create_dataset("train_labels", data = train_y, compression="gzip")
+print('Compressing test set...')
 test_images = f.create_dataset("test_images", data = test_x, compression="gzip")
 test_labels = f.create_dataset("test_labels", data = test_y, compression="gzip")
 f.close()

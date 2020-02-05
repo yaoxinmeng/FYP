@@ -23,111 +23,154 @@ if args.mode == 'test':
 # global variables
 filename = 'output.hdf5'    # data array
 BATCH_SIZE = 1              # batch size
-n_epochs = 20               # number of epochs
-PATH = 'my_model.pt'        # path of saved model
+n_epochs = 50               # number of epochs
+PATH = 'my_model_dense.pt'        # path of saved model
 
-# model definition
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
 
-        # Input of 3 x 256 x 256, output of 64 x 256 x 256
-        self.encode1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(64),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(64),
+# Dense block submodel definition (output is 4*k)
+class DenseBlock(nn.Module):
+    def __init__(self, C_in, k):
+        super(DenseBlockDown, self).__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(C_in, k, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(k),
+            nn.ReLU(),
+            nn.Dropout2d(0.2)
         )
 
-        # Input of 64 x 256 x 256, output of 128 x 128 x 128
-        self.encode2 = nn.Sequential(
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(128),
-            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(128),
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(C_in+k, k, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(k),
+            nn.ReLU(),
+            nn.Dropout2d(0.2)
         )
 
-        # Input of 128 x 128 x 128, output of 256 x 64 x 64
-        self.encode3 = nn.Sequential(
-            nn.MaxPool2d(2),
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(256),
+        self.layer3 = nn.Sequential(
+            nn.Conv2d(C_in+2*k, k, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(k),
+            nn.ReLU(),
+            nn.Dropout2d(0.2)
         )
 
-        # Input of 256 x 64 x 64, output of 512 x 32 x 32
-        self.encode4 = nn.Sequential(
-            nn.MaxPool2d(2),
-            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(512),
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(512),
+        self.layer4 = nn.Sequential(
+            nn.Conv2d(C_in+3*k, k, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(k),
+            nn.ReLU(),
+            nn.Dropout2d(0.2)
         )
-
-        # Input of 512 x 32 x 32, output of 256 x 64 x 64
-        self.decode4 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-
-        # Input of 512 x 64 x 64, output of 128 x 128 x 128
-        self.decode3 = nn.Sequential(
-            nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(256),
-            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        )
-
-        # Input of 256 x 128 x 128, output of 64 x 256 x 256
-        self.decode2 = nn.Sequential(
-            nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(128),
-            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(128),
-            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        )
-
-        # Input of 128 x 256 x 256, output of 2 x 256 x 256
-        self.decode1 = nn.Sequential(
-            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(64),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(64),
-            nn.Conv2d(64, 2, kernel_size=1, stride=1)
-        )
-
 
     # Defining the forward pass
     def forward(self, x):
-        x = self.encode1(x)
-        x1 = x.clone()
-        x = self.encode2(x)
-        x2 = x.clone()
-        x = self.encode3(x)
-        x3 = x.clone()
-        x = self.encode4(x)
-        x = self.decode4(x)
-        x = torch.cat((x3, x), 1)
-        x = self.decode3(x)
-        x = torch.cat((x2, x), 1)
-        x = self.decode2(x)
-        x = torch.cat((x1, x), 1)
-        x = self.decode1(x)
+        x1 = self.layer1(x)
+        x = torch.cat(x, x1)
+        x2 = self.layer2(x)
+        x = torch.cat(x, x2)
+        x3 = self.layer3(x)
+        x = torch.cat(x, x3)
+        x4 = self.layer4(x)
+        x = torch.cat(x1, x2, x3, x4)
         return x
+
+
+# Transition down module (output is C_in)
+class TD(nn.Module):
+    def __init__(self, C_in):
+        super(TD, self).__init__()
+        self.conv = nn.Conv2d(C_in, C_in, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(2)
+        
+    # Defining the forward pass
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.pool(x)
+        return x   
+
+
+# Transition up module (output is C_in/2)
+class TU(nn.Module):
+    def __init__(self, C_in):
+        super(TD, self).__init__()
+        self.conv_t = nn.ConvTranspose2d(C_in, C_in/2, kernel_size=2, stride=2)
+        
+    # Defining the forward pass
+    def forward(self, x):
+        x = self.conv_t(x)
+        return x   
+        
+        
+# DenseNet model definition
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        
+        # Output of 64 channels
+        self.firstconv = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        
+        # Output of 64 channels
+        self.block1 = DenseBlock(64, 16)
+        
+        # Output of 128 channels
+        self.td = TD(128)
+        self.block2 = DenseBlock(128, 32)
+        
+        # Output of 256 channels
+        self.bottleneck = nn.Sequential(
+            TD(256),
+            DenseBlock(256, 128),
+            TU(512)
+        )
+        
+        # Output of 128 channels
+        self.block3 = DenseBlock(512, 64)
+        self.tu = TU(256)
+        
+        # Output of 64 channels
+        self.block4 = DenseBlock(128, 16)
+        
+        # Output of 2 channels
+        self.finalconv = nn.Conv2d(64, 2, kernel_size=3, stride=1, padding=1)
+        
+    # Defining the forward pass
+    def forward(self, x):
+        x = self.firstconv(x)
+        x1 = self.block1(x)
+        x1 = torch.cat(x, x1)
+        x = self.td(x1)
+        x2 = self.block2(x)
+        x2 = torch.cat(x, x2)
+        x = self.bottleneck(x2)
+        x = torch.cat(x, x2)
+        x = self.block3(x)
+        x = self.tu(x)
+        x = torch.cat(x, x1)
+        x = self.block4(x)
+        x = self.finalconv(x)
+        return x
+
+
+# Custom tensor dataset with support of transforms
+class CustomTensorDataset(torch.utils.data.Dataset):
+    def __init__(self, arrays):
+        assert all(arrays[0].shape[0] == array.shape[0] for array in arrays)
+        self.arrays = arrays
+        self.image_trf = T.Compose([
+            T.ToTensor(),
+            T.Normalize(mean = [0.485, 0.456, 0.406],
+                        std = [0.229, 0.224, 0.225],
+                        inplace = True)
+            ])
+        self.label_trf = T.ToTensor()
+        
+    def __getitem__(self, index):
+        x = self.arrays[0][index]
+        x = self.image_trf(x)
+        y = self.arrays[1][index]
+        y = self.label_trf(y)
+        y = y.view(256, 256)
+        return x, y
+
+    def __len__(self):
+        return self.arrays[0].shape[0]
 
 
 # visual display of results
@@ -190,21 +233,22 @@ if args.mode == 'train':
     print(train_images.dtype, train_images.shape)
     print(train_labels.dtype, train_labels.shape)
 
-    # Convert to torch format
-    train_x = torch.from_numpy(train_images)
-    train_x = train_x.view(-1, 3, 256, 256)
-    train_y = torch.from_numpy(train_labels)
-    train_y = train_y.view(-1, 256, 256).type(torch.LongTensor)
-    val_x = torch.from_numpy(test_images)
-    val_x = val_x.view(-1, 3, 256, 256)
-    val_y = torch.from_numpy(test_labels)
-    val_y = val_y.view(-1, 256, 256).type(torch.LongTensor)
-    print(train_x.dtype, train_x.shape)
-    print(train_y.dtype, train_y.shape)
-
     # create dataset
-    trainset = torch.utils.data.TensorDataset(train_x, train_y)
-    testset = torch.utils.data.TensorDataset(val_x, val_y)
+    trainset = CustomTensorDataset((train_images, train_labels))
+    testset = CustomTensorDataset((test_images, test_labels))
+    
+    # # Visualize sample from dataset
+    # x, y = trainset[0]
+    # print(x.dtype, x.shape)
+    # print(y.dtype, y.shape)
+    # plt.subplot(1, 3, 1)
+    # plt.imshow(train_images[0])
+    # plt.subplot(1, 3, 2)
+    # plt.imshow(x.permute(1, 2, 0))
+    # plt.subplot(1, 3, 3)
+    # plt.imshow(y)
+    # plt.show()
+    # del x, y
 
     # defining the model
     model = Net()
@@ -292,6 +336,10 @@ if args.mode == 'test':
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
     summary(model, (3, 256, 256))
-
+    
+    # generate dataset
+    testset = CustomTensorDataset((test_images, test_labels))
+    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
+    
     # visualise sample test data
     show_predictions(testloader, 5)
