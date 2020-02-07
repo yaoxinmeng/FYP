@@ -1,14 +1,13 @@
 # Creates a train and test set of type uint8
 # x has shape (-1 x 256 x 256 x 3), range [0, 255], type uint8
 # y has shape (-1 x 256 x 256), range [0, 1], type uint8
-
+#
 import cv2
 import os
 import numpy as np
 import argparse
 import h5py
 from tqdm import tqdm
-
 
 # input argument
 parser = argparse.ArgumentParser()
@@ -19,6 +18,19 @@ args = parser.parse_args()
 data_path = os.path.join(args.pathname, 'data')
 label_path = os.path.join(args.pathname, 'label')
 outfile = 'output.hdf5'
+
+# threshold - above will be white, below will be black
+threshold = 100
+
+# function to thicken lines
+def edit_label(label):
+    for x in np.nditer(label, op_flags=['readwrite']):
+        if x > threshold:
+            x[...] = 255
+        else:
+            x[...] = 0
+    return label
+
 
 # count number of files
 length = 0
@@ -33,7 +45,7 @@ label_list = np.zeros((4*length, 256, 256), dtype='uint8')
 # augment data and labels in directory
 count = 0
 for subdir, dirs, files in os.walk(data_path):
-    for file in files:
+    for file in tqdm(files):
         # read data and labels
         # get image from path given
         filename = os.path.join(data_path, file)
@@ -41,6 +53,7 @@ for subdir, dirs, files in os.walk(data_path):
         # get label from path
         filename = os.path.join(label_path, file)
         label = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+        label = edit_label(label)
 
         # augment data
         # flip horizontally
@@ -61,8 +74,6 @@ for subdir, dirs, files in os.walk(data_path):
         label_list[4*count+3] = (flipped_label/255)
 
         count += 1
-        if count%10 == 0:
-            print('Finished', count, 'images')
 
 print('Data', data_list.dtype, data_list.shape)
 print('Label', label_list.dtype, label_list.shape)

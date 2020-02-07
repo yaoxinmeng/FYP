@@ -139,14 +139,6 @@ def draw(d, p0, p1, v, fill, width):
     d.line([tuple(f0), tuple(f1)], fill=fill, width=width)
 
 
-# redundant for now
-def img2array(img):  # take in Image type argument
-    # convert to grayscale
-    img_gray = img.convert('L')
-    array = np.asarray(img_gray.getdata(), dtype=np.uint8).reshape((256, 256))
-    return array/255.0
-
-
 def save_label():  # take in Image type argument
     # draw lines on a blank image
     label = draw_lines()

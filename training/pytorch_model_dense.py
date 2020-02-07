@@ -8,6 +8,7 @@ import torch
 from torch.autograd import Variable
 from torch import nn, optim
 from torchsummary import summary
+import torchvision.transforms as T
 
 print('Torch', torch.__version__, 'CUDA', torch.version.cuda)
 print('Device:', torch.device('cuda:0'), torch.cuda.get_device_name(0))
@@ -24,37 +25,38 @@ if args.mode == 'test':
 filename = 'output.hdf5'    # data array
 BATCH_SIZE = 1              # batch size
 n_epochs = 50               # number of epochs
-PATH = 'my_model_dense.pt'        # path of saved model
+PATH = 'my_model_dense.pt'  # path of saved model
+FIG_NAME = 'dense_loss.png' # name of figure plot
 
 
 # Dense block submodel definition (output is 4*k)
 class DenseBlock(nn.Module):
     def __init__(self, C_in, k):
-        super(DenseBlockDown, self).__init__()
+        super(DenseBlock, self).__init__()
         self.layer1 = nn.Sequential(
             nn.Conv2d(C_in, k, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(k),
+            nn.BatchNorm2d(k, track_running_stats=False),
             nn.ReLU(),
             nn.Dropout2d(0.2)
         )
 
         self.layer2 = nn.Sequential(
             nn.Conv2d(C_in+k, k, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(k),
+            nn.BatchNorm2d(k, track_running_stats=False),
             nn.ReLU(),
             nn.Dropout2d(0.2)
         )
 
         self.layer3 = nn.Sequential(
             nn.Conv2d(C_in+2*k, k, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(k),
+            nn.BatchNorm2d(k, track_running_stats=False),
             nn.ReLU(),
             nn.Dropout2d(0.2)
         )
 
         self.layer4 = nn.Sequential(
             nn.Conv2d(C_in+3*k, k, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(k),
+            nn.BatchNorm2d(k, track_running_stats=False),
             nn.ReLU(),
             nn.Dropout2d(0.2)
         )
@@ -62,13 +64,13 @@ class DenseBlock(nn.Module):
     # Defining the forward pass
     def forward(self, x):
         x1 = self.layer1(x)
-        x = torch.cat(x, x1)
+        x = torch.cat((x, x1), 1)
         x2 = self.layer2(x)
-        x = torch.cat(x, x2)
+        x = torch.cat((x, x2), 1)
         x3 = self.layer3(x)
-        x = torch.cat(x, x3)
+        x = torch.cat((x, x3), 1)
         x4 = self.layer4(x)
-        x = torch.cat(x1, x2, x3, x4)
+        x = torch.cat((x1, x2, x3, x4), 1)
         return x
 
 
@@ -78,71 +80,71 @@ class TD(nn.Module):
         super(TD, self).__init__()
         self.conv = nn.Conv2d(C_in, C_in, kernel_size=3, stride=1, padding=1)
         self.pool = nn.MaxPool2d(2)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x = self.conv(x)
         x = self.pool(x)
-        return x   
+        return x
 
 
 # Transition up module (output is C_in/2)
 class TU(nn.Module):
     def __init__(self, C_in):
-        super(TD, self).__init__()
-        self.conv_t = nn.ConvTranspose2d(C_in, C_in/2, kernel_size=2, stride=2)
-        
+        super(TU, self).__init__()
+        self.conv_t = nn.ConvTranspose2d(C_in, int(C_in/2), kernel_size=2, stride=2)
+
     # Defining the forward pass
     def forward(self, x):
         x = self.conv_t(x)
-        return x   
-        
-        
+        return x
+
+
 # DenseNet model definition
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        
+
         # Output of 64 channels
         self.firstconv = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
-        
+
         # Output of 64 channels
         self.block1 = DenseBlock(64, 16)
-        
+
         # Output of 128 channels
         self.td = TD(128)
         self.block2 = DenseBlock(128, 32)
-        
+
         # Output of 256 channels
         self.bottleneck = nn.Sequential(
             TD(256),
             DenseBlock(256, 128),
             TU(512)
         )
-        
+
         # Output of 128 channels
         self.block3 = DenseBlock(512, 64)
         self.tu = TU(256)
-        
+
         # Output of 64 channels
-        self.block4 = DenseBlock(128, 16)
-        
+        self.block4 = DenseBlock(256, 16)
+
         # Output of 2 channels
         self.finalconv = nn.Conv2d(64, 2, kernel_size=3, stride=1, padding=1)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x = self.firstconv(x)
         x1 = self.block1(x)
-        x1 = torch.cat(x, x1)
+        x1 = torch.cat((x, x1), 1)
         x = self.td(x1)
         x2 = self.block2(x)
-        x2 = torch.cat(x, x2)
+        x2 = torch.cat((x, x2), 1)
         x = self.bottleneck(x2)
-        x = torch.cat(x, x2)
+        x = torch.cat((x, x2), 1)
         x = self.block3(x)
         x = self.tu(x)
-        x = torch.cat(x, x1)
+        x = torch.cat((x, x1), 1)
         x = self.block4(x)
         x = self.finalconv(x)
         return x
@@ -159,14 +161,12 @@ class CustomTensorDataset(torch.utils.data.Dataset):
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-        self.label_trf = T.ToTensor()
-        
+
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
         y = self.arrays[1][index]
-        y = self.label_trf(y)
-        y = y.view(256, 256)
+        y = torch.from_numpy(y).view(256, 256).type(torch.LongTensor)
         return x, y
 
     def __len__(self):
@@ -201,11 +201,12 @@ def show_predictions(dataset, num):
         image, mask = data
         with torch.no_grad():
             pred_mask = model(image.cuda())
-        image = image.to(torch.device("cpu")).view(-1, 256, 256, 3)
-        mask = mask.to(torch.device("cpu"))
-        pred_mask = pred_mask.to(torch.device("cpu"))
-        print(accuracy(pred_mask[0], mask[0]))
-        display([image[0].numpy(), mask[0].numpy(), create_mask(pred_mask[0])])
+
+        pred_mask = pred_mask[0].cpu()
+        mask = mask[0]
+        image = image[0]
+        print(accuracy(pred_mask, mask))
+        display([image.permute(1, 2, 0), mask, pred_mask[1]])
 
 
 def accuracy(pred, true):
@@ -236,7 +237,7 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
-    
+
     # # Visualize sample from dataset
     # x, y = trainset[0]
     # print(x.dtype, x.shape)
@@ -276,8 +277,9 @@ if args.mode == 'train':
         loss_train = 0
         loss_val = 0
         # computing the training loss batch-wise
+        model.train()
         for inputs, labels in tqdm(trainloader):
-            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda().type(torch.cuda.LongTensor))
+            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
             # clearing the Gradients of the model parameters
             optimizer.zero_grad()
             # prediction for training and validation set
@@ -291,8 +293,9 @@ if args.mode == 'train':
         loss_train = loss_train / (train_size/BATCH_SIZE)
 
         # computing the validation loss batch-wise
+        model.eval()
         for inputs, labels in tqdm(testloader):
-            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda().type(torch.cuda.LongTensor))
+            inputs, labels = inputs.cuda(), labels.cuda()
             with torch.no_grad():
                 output_val = model(inputs)
             loss_val += criterion(output_val, labels)
@@ -310,7 +313,7 @@ if args.mode == 'train':
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
     plt.legend()
-    plt.show()
+    plt.savefig(FIG_NAME)
 
 
 # Test mode
@@ -322,24 +325,16 @@ if args.mode == 'test':
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
 
-    # generate dataset
-    val_x = torch.from_numpy(test_images)
-    val_x = val_x.view(-1, 3, 256, 256)
-    val_y = torch.from_numpy(test_labels)
-    val_y = val_y.view(-1, 256, 256)
-    print(val_x.shape, val_x.type)
-    testset = torch.utils.data.TensorDataset(val_x, val_y)
+     # generate dataset
+    testset = CustomTensorDataset((test_images, test_labels))
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
 
     # Load model
     model = Net()
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
+    model.eval()
     summary(model, (3, 256, 256))
-    
-    # generate dataset
-    testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-    
+
     # visualise sample test data
     show_predictions(testloader, 5)
