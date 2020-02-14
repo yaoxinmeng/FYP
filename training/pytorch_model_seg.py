@@ -23,8 +23,8 @@ if args.mode == 'test':
 
 # global variables
 filename = 'output.hdf5'    # data array
-BATCH_SIZE = 1              # batch size
-n_epochs = 100              # number of epochs
+BATCH_SIZE = 2              # batch size
+n_epochs = 50              # number of epochs
 PATH = 'my_model_seg.pt'    # path of saved model
 FIG_NAME = 'seg_loss.png'   # name of figure plot
 
@@ -101,7 +101,7 @@ class Net(nn.Module):
 
         # Input of 64 x 256 x 256, output of 1 x 256 x 256
         self.decode1 = Decoder(64, 1)
-
+        
     # Defining the forward pass
     def forward(self, x):
         x, indice1 = self.encode1(x)
@@ -115,7 +115,7 @@ class Net(nn.Module):
         x = self.decode1(x)
         x = x.view(-1, 256, 256)
         return x
-
+    
     # Show the channel features from each layer
     def visualize_features(self, x):
         plt.figure(1)
@@ -152,12 +152,12 @@ class CustomTensorDataset(torch.utils.data.Dataset):
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-
+        
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
         y = self.arrays[1][index]
-        y = torch.from_numpy(y).view(256, 256).type(torch.LongTensor)
+        y = torch.from_numpy(y).view(256, 256).type(torch.float32)
         return x, y
 
     def __len__(self):
@@ -176,11 +176,11 @@ def display(display_list):
     plt.show()
 
 
-# creates a mask for display
-def create_mask(pred_mask):
-    # the label assigned to the pixel is the channel with the highest value
-    pred_mask = torch.argmax(pred_mask, dim=0)
-    return pred_mask
+# # creates a mask for display
+# def create_mask(pred_mask):
+    # # the label assigned to the pixel is the channel with the highest value
+    # pred_mask = torch.argmax(pred_mask, dim=0)
+    # return pred_mask
 
 
 # show predictions from a dataset
@@ -197,12 +197,11 @@ def show_predictions(dataset, num):
         mask = mask[0]
         image = image[0]
         print(accuracy(pred_mask, mask))
-        display([image.permute(1, 2, 0), mask, pred_mask[1]])
+        display([image.permute(1, 2, 0), mask, pred_mask])
 
 
 def accuracy(pred, true):
     sum = 0
-    pred = create_mask(pred)
     for x in range(256):
         for y in range(256):
             if pred[x][y] == true[x][y]:
@@ -228,7 +227,7 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
-
+    
     # # Visualize sample from dataset
     # x, y = trainset[0]
     # print(x.dtype, x.shape)
@@ -241,7 +240,7 @@ if args.mode == 'train':
     # plt.imshow(y)
     # plt.show()
     # del x, y
-
+    
     # defining the model
     model = Net()
     model = model.cuda()
@@ -266,7 +265,7 @@ if args.mode == 'train':
         testloader=torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False)
         loss_train = 0
         loss_val = 0
-
+        
         # computing the training loss batch-wise
         model.train()
         for inputs, labels in tqdm(trainloader):
@@ -333,14 +332,14 @@ if args.mode == 'test':
     model = model.cuda()
     model.eval()
     summary(model, (3, 256, 256))
-
+    
     # visualise features
     for i, data in enumerate(testloader, 0):
         inputs, labels = data
         with torch.no_grad():
             model.visualize_features(inputs.cuda())
         break
-
+        
     # visualise sample test data
     show_predictions(trainloader, 2)
     show_predictions(testloader, 2)

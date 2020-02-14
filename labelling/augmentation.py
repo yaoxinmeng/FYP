@@ -1,7 +1,7 @@
 # Creates a train and test set of type uint8
 # x has shape (-1 x 256 x 256 x 3), range [0, 255], type uint8
 # y has shape (-1 x 256 x 256), range [0, 1], type uint8
-#
+
 import cv2
 import os
 import numpy as np

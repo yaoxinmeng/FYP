@@ -24,10 +24,11 @@ if args.mode == 'test':
 
 # global variables
 filename = 'output.hdf5'    # data array
-BATCH_SIZE = 10              # batch size
+BATCH_SIZE = 5              # batch size
 n_epochs = 20               # number of epochs
 PATH = 'my_model_trf.pt'        # path of saved model
 dim = 224                   # dimension of images
+FIG_NAME = 'trf_loss.png' # name of figure plot
 
 
 # Model definition
@@ -35,11 +36,11 @@ model = models.segmentation.fcn_resnet101(pretrained=True)
 for param in model.parameters():
     param.requires_grad = False
 model.classifier[4] = nn.Sequential(
-    nn.Conv2d(512, 64, kernel_size=1, stride=1),
-    nn.BatchNorm2d(64),
+    nn.Conv2d(512, 64, kernel_size=3, stride=1),
+    nn.Dropout(0.2),
+    nn.BatchNorm2d(64, track_running_stats=False),
     nn.ReLU(),
-    nn.Dropout(0.1),
-    nn.Conv2d(64, 2, kernel_size=1, stride=1),
+    nn.Conv2d(64, 1, kernel_size=3, stride=1),
 )
 model.aux_classifier = nn.Identity()
 print(model)
@@ -51,19 +52,25 @@ class CustomTensorDataset(torch.utils.data.Dataset):
         assert all(arrays[0].shape[0] == array.shape[0] for array in arrays)
         self.arrays = arrays
         self.image_trf = T.Compose([
+            T.ToPILImage(),
+            T.Resize(dim),
             T.ToTensor(),
             T.Normalize(mean = [0.485, 0.456, 0.406],
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-        self.label_trf = T.ToTensor()
-        
+        self.label_trf = T.Compose([
+            T.ToPILImage(),
+            T.Resize(dim),
+            T.ToTensor()
+            ])
+
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
         y = self.arrays[1][index]
         y = self.label_trf(y)
-        y = y.view(256, 256)
+        y = y.view(dim, dim)
         return x, y
 
     def __len__(self):
@@ -82,37 +89,37 @@ def display(display_list):
     plt.show()
 
 
-# creates a mask for display
-def create_mask(pred_mask):
-    # the label assigned to the pixel is the channel with the highest value
-    pred_mask = torch.argmax(pred_mask, dim=0)
-    pred_mask = pred_mask.numpy()
-    return pred_mask
+# # creates a mask for display
+# def create_mask(pred_mask):
+    # # the label assigned to the pixel is the channel with the highest value
+    # pred_mask = torch.argmax(pred_mask, dim=0)
+    # return pred_mask
 
 
 # show predictions from a dataset
 def show_predictions(dataset, num):
+    activation = nn.Sigmoid()
     for i, data in enumerate(dataset, 0):
         if i >= num:
             break
         image, mask = data
         with torch.no_grad():
-            pred_mask = model(image.cuda())['out']
-        image = image.to(torch.device("cpu")).view(-1, dim, dim, 3)
-        mask = mask.to(torch.device("cpu")).view(-1, dim, dim)
-        pred_mask = pred_mask.to(torch.device("cpu"))
-        print(accuracy(pred_mask[0], mask[0]))
-        display([image[0].numpy(), mask[0].numpy(), create_mask(pred_mask[0])])
+            pred_mask = model(image.cuda())
+            pred_mask = activation(pred_mask)
+        pred_mask = pred_mask[0].cpu()
+        mask = mask[0]
+        image = image[0]
+        print(accuracy(pred_mask, mask))
+        display([image.permute(1, 2, 0), mask, pred_mask])
 
 
 def accuracy(pred, true):
     sum = 0
-    pred = create_mask(pred)
-    for x in range(dim):
-        for y in range(dim):
+    for x in range(256):
+        for y in range(256):
             if pred[x][y] == true[x][y]:
                 sum += 1
-    return sum/(dim*dim)
+    return sum/(256*256)
 
 
 # Train mode
@@ -133,6 +140,19 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
+
+    # Visualize sample from dataset
+    x, y = trainset[0]
+    print(x.dtype, x.shape)
+    print(y.dtype, y.shape)
+    plt.subplot(1, 3, 1)
+    plt.imshow(train_images[0])
+    plt.subplot(1, 3, 2)
+    plt.imshow(x.permute(1, 2, 0))
+    plt.subplot(1, 3, 3)
+    plt.imshow(y)
+    plt.show()
+    del x, y
 
     # defining the model
     model = model.cuda()
@@ -162,7 +182,7 @@ if args.mode == 'train':
             # clearing the Gradients of the model parameters
             optimizer.zero_grad()
             # prediction for training and validation set
-            output_train = model(inputs)['out']
+            output_train = model(inputs)['out'].view(-1, dim, dim)
             # computing the training and validation loss
             loss = criterion(output_train, labels) # compare the likelihood of a pixel being 1
             # computing the updated weights of all the model parameters
@@ -192,7 +212,7 @@ if args.mode == 'train':
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
     plt.legend()
-    plt.show()
+    plt.savefig(FIG_NAME)
 
 
 # Test mode

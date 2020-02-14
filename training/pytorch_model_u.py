@@ -23,7 +23,7 @@ if args.mode == 'test':
 
 # global variables
 filename = 'output.hdf5'    # data array
-BATCH_SIZE = 1              # batch size
+BATCH_SIZE = 2              # batch size
 n_epochs = 50               # number of epochs
 PATH = 'my_model_u.pt'      # path of saved model
 FIG_NAME = 'u_loss.png'     # name of figure plot
@@ -33,32 +33,32 @@ FIG_NAME = 'u_loss.png'     # name of figure plot
 class Conv(nn.Module):
     def __init__(self, C_in, C_out):
         super(Conv, self).__init__()
-
+        
         self.conv = nn.Sequential(
             nn.Conv2d(C_in, C_out, kernel_size=3, stride=1, padding=1),
-            nn.Dropout2d(0.3),
+            nn.Dropout2d(0.2),
             nn.BatchNorm2d(C_out, track_running_stats=False),
             nn.LeakyReLU(),
             nn.Conv2d(C_out, C_out, kernel_size=3, stride=1, padding=1),
-            nn.Dropout2d(0.3),
+            nn.Dropout2d(0.2),
             nn.BatchNorm2d(C_out, track_running_stats=False),
             nn.LeakyReLU(),
         )
-
+    
     # Defining the forward pass
     def forward(self, x):
         x = self.conv(x)
         return x
-
-
+        
+        
 # model definition
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-
+        
         # Input of 3 x 256 x 256, output of 64 x 256 x 256
         self.encode1 = Conv(3, 64)
-
+        
         # Input of 64 x 256 x 256, output of 128 x 128 x 128
         self.encode2 = nn.Sequential(
             nn.MaxPool2d(2),
@@ -70,22 +70,22 @@ class Net(nn.Module):
             nn.MaxPool2d(2),
             Conv(128, 256)
         )
-
+        
         # Input of 256 x 64 x 64, output of 512 x 32 x 32
         self.encode4 = nn.Sequential(
             nn.MaxPool2d(2),
             Conv(256, 512)
         )
-
+        
         # Input of 512 x 32 x 32, output of 256 x 64 x 64
         self.decode4 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-
+        
         # Input of 512 x 64 x 64, output of 128 x 128 x 128
         self.decode3 = nn.Sequential(
             Conv(512, 256),
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
         )
-
+        
         # Input of 256 x 128 x 128, output of 64 x 256 x 256
         self.decode2 = nn.Sequential(
             Conv(256, 128),
@@ -95,7 +95,7 @@ class Net(nn.Module):
         # Input of 128 x 256 x 256, output of 2 x 256 x 256
         self.decode1 = nn.Sequential(
             Conv(128, 64),
-            nn.Conv2d(64, 2, kernel_size=1, stride=1)
+            nn.Conv2d(64, 1, kernel_size=1, stride=1)
         )
 
     # Defining the forward pass
@@ -114,8 +114,9 @@ class Net(nn.Module):
         x = self.decode2(x)
         x = torch.cat((x1, x), 1)
         x = self.decode1(x)
+        x = x.view(-1, 256, 256)
         return x
-
+    
     # Show the filters from each layer
     def visualize_features(self, x):
         plt.figure(1)
@@ -146,7 +147,7 @@ class Net(nn.Module):
             plt.axis('off')
         plt.show()
 
-
+    
 # Custom tensor dataset with support of transforms
 class CustomTensorDataset(torch.utils.data.Dataset):
     def __init__(self, arrays):
@@ -158,18 +159,18 @@ class CustomTensorDataset(torch.utils.data.Dataset):
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-
+        
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
         y = self.arrays[1][index]
-        y = torch.from_numpy(y).view(256, 256).type(torch.LongTensor)
+        y = torch.from_numpy(y).view(256, 256).type(torch.float32)
         return x, y
 
     def __len__(self):
         return self.arrays[0].shape[0]
-
-
+        
+        
 # visual display of results
 def display(display_list):
     plt.figure(figsize=(15, 15))
@@ -182,38 +183,38 @@ def display(display_list):
     plt.show()
 
 
-# creates a mask for display
-def create_mask(pred_mask):
-    # the label assigned to the pixel is the channel with the highest value
-    pred_mask = torch.argmax(pred_mask, dim=0)
-    return pred_mask
+# # creates a mask for display
+# def create_mask(pred_mask):
+    # # the label assigned to the pixel is the channel with the highest value
+    # pred_mask = torch.argmax(pred_mask, dim=0)
+    # return pred_mask
 
 
 # show predictions from a dataset
 def show_predictions(dataset, num):
+    activation = nn.Sigmoid()
     for i, data in enumerate(dataset, 0):
         if i >= num:
             break
         image, mask = data
         with torch.no_grad():
             pred_mask = model(image.cuda())
-
+            pred_mask = activation(pred_mask)
         pred_mask = pred_mask[0].cpu()
         mask = mask[0]
         image = image[0]
         print(accuracy(pred_mask, mask))
-        display([image.permute(1, 2, 0), mask, pred_mask[1]])
+        display([image.permute(1, 2, 0), mask, pred_mask])
 
 
 def accuracy(pred, true):
     sum = 0
-    pred = create_mask(pred)
     for x in range(256):
         for y in range(256):
             if pred[x][y] == true[x][y]:
                 sum += 1
     return sum/(256*256)
-
+    
 
 # Train mode
 if args.mode == 'train':
@@ -233,7 +234,7 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
-
+    
     # # Visualize sample from dataset
     # x, y = trainset[0]
     # print(x.dtype, x.shape)
@@ -253,10 +254,10 @@ if args.mode == 'train':
     # defining the optimizer
     optimizer = optim.Adam(model.parameters(), lr=0.07)
     # defining the loss function
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     criterion = criterion.cuda()
     summary(model, (3, 256, 256))
-
+    
     # empty list to store training and validation losses
     train_losses = []
     val_losses = []
@@ -304,13 +305,13 @@ if args.mode == 'train':
 
     # save model
     torch.save(model.state_dict(), PATH)
-
+    
     # plotting the training and validation loss
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
     plt.legend()
     plt.savefig(FIG_NAME)
-
+ 
 
 # Test mode
 if args.mode == 'test':
@@ -320,24 +321,25 @@ if args.mode == 'test':
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
-
+    
     # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-
+    
     # Load model
     model = Net()
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
     model.eval()
     summary(model, (3, 256, 256))
-
+    
     # visualise features
     for i, data in enumerate(testloader, 0):
         inputs, labels = data
         with torch.no_grad():
             model.visualize_features(inputs.cuda())
         break
-
+    
     # visualise sample test data
     show_predictions(testloader, 5)
+    

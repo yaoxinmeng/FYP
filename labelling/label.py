@@ -37,42 +37,15 @@ line = np.zeros((2, 2))
 line_list = []
 image = ''
 
-
+################################################################################
+# FOR SAVING FILES
+################################################################################
 # create a blank img
 def blank_image():
-    array = np.zeros([256, 256, 3], dtype=np.uint8)
+    array = np.zeros([512, 512, 3], dtype=np.uint8)
     array.fill(255)
     img = Image.fromarray(array)
     return img
-
-
-# makes a button with
-# msg = test in button
-# x, y = coordinates of top left point of button
-# w, h = width and height of button
-# ic, ac = inactive and active colors
-# action = function to be called
-def button(msg,x,y,w,h,ic,ac,action = None):
-    mouse = pygame.mouse.get_pos()
-    click = pygame.mouse.get_pressed()
-    if x+w > mouse[0] > x and y+h > mouse[1] > y:
-        pygame.draw.rect(display_surface, ac,(x,y,w,h))
-        if click[0] == 1 and action != None:
-            action()
-    else:
-        pygame.draw.rect(display_surface, ic,(x,y,w,h))
-
-    textsurf, textrect = text_objects(msg, "freesansbold.ttf", 20)
-    textrect.center = ((x+(w/2)), (y+(h/2)))
-    display_surface.blit(textsurf, textrect)
-
-
-# define text object
-def text_objects(text, font, size):
-    smalltext = pygame.font.Font(font, size)
-    textsurface = smalltext.render(text, True, black)
-    return textsurface, textsurface.get_rect()
-
 
 # save current image and load next image
 def done():
@@ -89,19 +62,21 @@ def done():
     reset_display(display_surface)
     pygame.time.wait(200)  # 15ms delay to debounce
 
-
+# draw lines on label
 def draw_lines():
     img = blank_image()
     d = ImageDraw.Draw(img)
     for lines in line_list:
-        p0 = tuple(lines[0]/2)  # half due to resize
-        p1 = tuple(lines[1]/2)
+        x, y = lines[0]
+        p0 = tuple((x-image_x, y-image_y))
+        x, y = lines[1]
+        p1 = tuple((x-image_x, y-image_y))
         d.line([p0, p1], fill=black, width=1)
         draw_fuzzy(d, p0, p1)
     del d
     return img
 
-
+# thicken lines on label
 def draw_fuzzy(d, p0, p1):
     # get line vector between 2 points
     vector = np.subtract(p0, p1)
@@ -132,33 +107,27 @@ def draw_fuzzy(d, p0, p1):
         draw(d, p0, p1, (4, 0), grey_1, 1)
         draw(d, p0, p1, (-4, 0), grey_1, 1)
 
-
-def draw(d, p0, p1, v, fill, width):
-    f0 = np.add(p0, v)
-    f1 = np.add(p1, v)
-    d.line([tuple(f0), tuple(f1)], fill=fill, width=width)
-
-
-def save_label():  # take in Image type argument
+# save label file
+def save_label():
     # draw lines on a blank image
     label = draw_lines()
-
     # convert to grayscale
-    label_gray = label.convert('L')
+    label_gray = np.array(label.convert('L'))
+    # resize to 256x256
+    label_final = cv2.resize(label_gray, (256, 256))
 
     # define path
     file_name = os.path.split(image)[1]
     img_path = os.path.join(output_path_label, file_name)
 
     # save image
-    label_gray.save(img_path)
+    cv2.imwrite(img_path, label_final)
 
-
+# save image file
 def save_image():
     # resize image
     img = cv2.imread(image)
-    dim = (256, 256)
-    new_img = cv2.resize(img, dim)
+    new_img = cv2.resize(img, (256, 256))
 
     # save image to path
     file_name = os.path.split(image)[1]
@@ -169,6 +138,43 @@ def save_image():
 
     # DELETE IMAGE FROM input_path FOLDER
     os.remove(image)
+
+
+################################################################################
+# FOR LABELLING TOOL
+################################################################################
+# makes a button with
+# msg = test in button
+# x, y = coordinates of top left point of button
+# w, h = width and height of button
+# ic, ac = inactive and active colors
+# action = function to be called
+def button(msg,x,y,w,h,ic,ac,action = None):
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+    if x+w > mouse[0] > x and y+h > mouse[1] > y:
+        pygame.draw.rect(display_surface, ac,(x,y,w,h))
+        if click[0] == 1 and action != None:
+            action()
+    else:
+        pygame.draw.rect(display_surface, ic,(x,y,w,h))
+
+    textsurf, textrect = text_objects(msg, "freesansbold.ttf", 20)
+    textrect.center = ((x+(w/2)), (y+(h/2)))
+    display_surface.blit(textsurf, textrect)
+
+
+# define text object
+def text_objects(text, font, size):
+    smalltext = pygame.font.Font(font, size)
+    textsurface = smalltext.render(text, True, black)
+    return textsurface, textsurface.get_rect()
+
+
+def draw(d, p0, p1, v, fill, width):
+    f0 = np.add(p0, v)
+    f1 = np.add(p1, v)
+    d.line([tuple(f0), tuple(f1)], fill=fill, width=width)
 
 
 # undo previous operation
