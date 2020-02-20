@@ -24,7 +24,7 @@ if args.mode == 'test':
 
 # global variables
 filename = 'output.hdf5'    # data array
-BATCH_SIZE = 5              # batch size
+BATCH_SIZE = 20              # batch size
 n_epochs = 20               # number of epochs
 PATH = 'my_model_trf.pt'        # path of saved model
 dim = 224                   # dimension of images
@@ -104,7 +104,7 @@ def show_predictions(dataset, num):
             break
         image, mask = data
         with torch.no_grad():
-            pred_mask = model(image.cuda())
+            pred_mask = model(image.cuda())['out'].view(-1, dim, dim)
             pred_mask = activation(pred_mask)
         pred_mask = pred_mask[0].cpu()
         mask = mask[0]
@@ -115,11 +115,10 @@ def show_predictions(dataset, num):
 
 def accuracy(pred, true):
     sum = 0
-    for x in range(256):
-        for y in range(256):
-            if pred[x][y] == true[x][y]:
-                sum += 1
-    return sum/(256*256)
+    for x in range(dim):
+        for y in range(dim):
+            sum += abs(pred[x][y] - true[x][y])
+    return sum/(dim*dim)
 
 
 # Train mode
@@ -141,22 +140,24 @@ if args.mode == 'train':
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
 
-    # Visualize sample from dataset
-    x, y = trainset[0]
-    print(x.dtype, x.shape)
-    print(y.dtype, y.shape)
-    plt.subplot(1, 3, 1)
-    plt.imshow(train_images[0])
-    plt.subplot(1, 3, 2)
-    plt.imshow(x.permute(1, 2, 0))
-    plt.subplot(1, 3, 3)
-    plt.imshow(y)
-    plt.show()
-    del x, y
+    # # Visualize sample from dataset
+    # x, y = trainset[0]
+    # print(x.dtype, x.shape)
+    # print(y.dtype, y.shape)
+    # plt.subplot(2, 2, 1)
+    # plt.imshow(train_images[0])
+    # plt.subplot(2, 2, 2)
+    # plt.imshow(x.permute(1, 2, 0))
+    # plt.subplot(2, 2, 3)
+    # plt.imshow(train_labels[0])
+    # plt.subplot(2, 2, 4)
+    # plt.imshow(y)
+    # plt.show()
+    # del x, y
 
     # defining the model
     model = model.cuda()
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     criterion = criterion.cuda()
     optimizer = optim.Adam(model.parameters())
 
@@ -176,9 +177,9 @@ if args.mode == 'train':
         loss_train = 0
         loss_val = 0
         # computing the training loss batch-wise
+        model.train()
         for inputs, labels in tqdm(trainloader):
-            inputs = Variable(inputs.cuda())
-            labels = Variable(labels.cuda().type(torch.cuda.LongTensor).view(-1, dim, dim))
+            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
             # clearing the Gradients of the model parameters
             optimizer.zero_grad()
             # prediction for training and validation set
@@ -192,11 +193,11 @@ if args.mode == 'train':
         loss_train = loss_train / (train_size/BATCH_SIZE)
 
         # computing the validation loss batch-wise
+        model.eval()
         for inputs, labels in tqdm(testloader):
-            inputs = inputs.cuda()
-            labels = labels.cuda().type(torch.cuda.LongTensor).view(-1, dim, dim)
+            inputs, labels = inputs.cuda(), labels.cuda()
             with torch.no_grad():
-                output_val = model(inputs)['out']
+                output_val = model(inputs)['out'].view(-1, dim, dim)
             loss_val += criterion(output_val, labels)
         loss_val = loss_val / (val_size/BATCH_SIZE)
 
@@ -206,6 +207,7 @@ if args.mode == 'train':
         print('train_loss :', loss_train, '\t', 'val_loss :', loss_val)
 
     # save model
+    print('Saving...')
     torch.save(model.state_dict(), PATH)
 
     # plotting the training and validation loss
@@ -231,6 +233,7 @@ if args.mode == 'test':
     # Load model
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
+    model.eval()
 
     # visualise sample test data
     show_predictions(testloader, 5)

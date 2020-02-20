@@ -211,8 +211,7 @@ def accuracy(pred, true):
     sum = 0
     for x in range(256):
         for y in range(256):
-            if pred[x][y] == true[x][y]:
-                sum += 1
+            sum += abs(pred[x][y] - true[x][y])
     return sum/(256*256)
     
 
@@ -304,6 +303,7 @@ if args.mode == 'train':
         print('train_loss :', loss_train, '\t', 'val_loss :', loss_val)
 
     # save model
+    print('Saving...')
     torch.save(model.state_dict(), PATH)
     
     # plotting the training and validation loss

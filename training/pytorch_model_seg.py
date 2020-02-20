@@ -204,8 +204,7 @@ def accuracy(pred, true):
     sum = 0
     for x in range(256):
         for y in range(256):
-            if pred[x][y] == true[x][y]:
-                sum += 1
+            sum += abs(pred[x][y] - true[x][y])
     return sum/(256*256)
 
 
@@ -298,6 +297,7 @@ if args.mode == 'train':
         print('train_loss :', loss_train, '\t', 'val_loss :', loss_val)
 
     # save model
+    print('Saving...')
     torch.save(model.state_dict(), PATH)
 
     # plotting the training and validation loss
@@ -311,21 +311,15 @@ if args.mode == 'train':
 if args.mode == 'test':
     # Unpack test sample
     f = h5py.File(filename, "r")
-    print('Unpacking train images...')
-    train_images = np.array(f.get("train_images"))
-    print('Unpacking train labels...')
-    train_labels = np.array(f.get("train_labels"))
     print('Unpackaging test images...')
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
-
+    
     # generate dataset
-    trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-    trainloader=torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
-
+    
     # Load model
     model = Net()
     model.load_state_dict(torch.load(PATH))
@@ -339,7 +333,6 @@ if args.mode == 'test':
         with torch.no_grad():
             model.visualize_features(inputs.cuda())
         break
-        
+    
     # visualise sample test data
-    show_predictions(trainloader, 2)
-    show_predictions(testloader, 2)
+    show_predictions(testloader, 5)
