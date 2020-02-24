@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 import h5py
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # input argument
 parser = argparse.ArgumentParser()
@@ -20,7 +21,8 @@ label_path = os.path.join(args.pathname, 'label')
 outfile = 'output.hdf5'
 
 # threshold - above will be white, below will be black
-threshold = 100
+# black(0), grey_8(51), grey_4(153), grey_2(204), grey_1(230), white(255)
+threshold = 50
 
 # function to thicken lines
 def edit_label(label):
@@ -40,7 +42,7 @@ for subdir, dirs, files in os.walk(data_path):
 
 # list of files
 data_list = np.zeros((4*length, 256, 256, 3), dtype='uint8')
-label_list = np.zeros((4*length, 256, 256), dtype='uint8')
+label_list = np.zeros((4*length, 256, 256), dtype='float32')
 
 # augment data and labels in directory
 count = 0
@@ -72,6 +74,17 @@ for subdir, dirs, files in os.walk(data_path):
         label_list[4*count+1] = (flipped_label/255)
         label_list[4*count+2] = (label/255)
         label_list[4*count+3] = (flipped_label/255)
+
+        # # For debugging purposes
+        # plt.subplot(2, 2, 1)
+        # plt.imshow(label_list[0])
+        # plt.show()
+        # plt.subplot(2, 2, 2)
+        # plt.imshow(label_list[1])
+        # plt.subplot(2, 2, 3)
+        # plt.imshow(label_list[2])
+        # plt.subplot(2, 2, 4)
+        # plt.imshow(label_list[3])
 
         count += 1
 
