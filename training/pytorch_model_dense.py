@@ -80,12 +80,12 @@ class TD(nn.Module):
         super(TD, self).__init__()
         self.conv = nn.Conv2d(C_in, C_in, kernel_size=3, stride=1, padding=1)
         self.pool = nn.MaxPool2d(2)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x = self.conv(x)
         x = self.pool(x)
-        return x   
+        return x
 
 
 # Transition up module (output is C_in/2)
@@ -93,45 +93,45 @@ class TU(nn.Module):
     def __init__(self, C_in):
         super(TU, self).__init__()
         self.conv_t = nn.ConvTranspose2d(C_in, int(C_in/2), kernel_size=2, stride=2)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x = self.conv_t(x)
-        return x   
-        
-        
+        return x
+
+
 # DenseNet model definition
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        
+
         # Output of 64 channels
         self.firstconv = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
-        
+
         # Output of 64 channels
         self.block1 = DenseBlock(64, 16)
-        
+
         # Output of 128 channels
         self.td = TD(128)
         self.block2 = DenseBlock(128, 32)
-        
+
         # Output of 256 channels
         self.bottleneck = nn.Sequential(
             TD(256),
             DenseBlock(256, 128),
             TU(512)
         )
-        
+
         # Output of 128 channels
         self.block3 = DenseBlock(512, 64)
         self.tu = TU(256)
-        
+
         # Output of 64 channels
         self.block4 = DenseBlock(256, 16)
-        
+
         # Output of 2 channels
         self.finalconv = nn.Conv2d(64, 1, kernel_size=3, stride=1, padding=1)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x = self.firstconv(x)
@@ -162,7 +162,7 @@ class CustomTensorDataset(torch.utils.data.Dataset):
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-        
+
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
@@ -217,7 +217,7 @@ def accuracy(pred, true):
             sum += abs(pred[x][y] - true[x][y])
     return sum/(256*256)
 
-    
+
 # Train mode
 if args.mode == 'train':
     # Extract data from compressed hdf5
@@ -236,7 +236,7 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
-    
+
     # # Visualize sample from dataset
     # x, y = trainset[0]
     # print(x.dtype, x.shape)
@@ -327,7 +327,7 @@ if args.mode == 'test':
 
      # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
+    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
     # Load model
     model = Net()
@@ -335,6 +335,25 @@ if args.mode == 'test':
     model = model.cuda()
     model.eval()
     summary(model, (3, 256, 256))
-    
+
+    # evaluate loss adn accuracy
+    criterion = nn.BCEWithLogitsLoss()
+    criterion = criterion.cuda()
+    activation = nn.Sigmoid()
+    activation = activation.cuda()
+    loss = 0
+    acc = 0
+    for inputs, labels in tqdm(testloader):
+        inputs, labels = inputs.cuda(), labels.cuda()
+        with torch.no_grad():
+            output_val = model(inputs)
+        loss += criterion(output_val, labels)
+
+        output_val = activation(output_val)
+        acc += accuracy(output_val[0], labels[0])
+    loss = loss / test_images.shape[0]
+    acc = acc / test_images.shape[0]
+    print('loss :', loss, '\t', 'acc :', acc)
+
     # visualise sample test data
     show_predictions(testloader, 5)

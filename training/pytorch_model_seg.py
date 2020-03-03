@@ -101,7 +101,7 @@ class Net(nn.Module):
 
         # Input of 64 x 256 x 256, output of 1 x 256 x 256
         self.decode1 = Decoder(64, 1)
-        
+
     # Defining the forward pass
     def forward(self, x):
         x, indice1 = self.encode1(x)
@@ -115,7 +115,7 @@ class Net(nn.Module):
         x = self.decode1(x)
         x = x.view(-1, 256, 256)
         return x
-    
+
     # Show the channel features from each layer
     def visualize_features(self, x):
         plt.figure(1)
@@ -152,7 +152,7 @@ class CustomTensorDataset(torch.utils.data.Dataset):
                         std = [0.229, 0.224, 0.225],
                         inplace = True)
             ])
-        
+
     def __getitem__(self, index):
         x = self.arrays[0][index]
         x = self.image_trf(x)
@@ -226,7 +226,7 @@ if args.mode == 'train':
     # create dataset
     trainset = CustomTensorDataset((train_images, train_labels))
     testset = CustomTensorDataset((test_images, test_labels))
-    
+
     # # Visualize sample from dataset
     # x, y = trainset[0]
     # print(x.dtype, x.shape)
@@ -239,7 +239,7 @@ if args.mode == 'train':
     # plt.imshow(y)
     # plt.show()
     # del x, y
-    
+
     # defining the model
     model = Net()
     model = model.cuda()
@@ -264,7 +264,7 @@ if args.mode == 'train':
         testloader=torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False)
         loss_train = 0
         loss_val = 0
-        
+
         # computing the training loss batch-wise
         model.train()
         for inputs, labels in tqdm(trainloader):
@@ -315,24 +315,43 @@ if args.mode == 'test':
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
-    
+
     # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
-    
+    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
+
     # Load model
     model = Net()
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
     model.eval()
     summary(model, (3, 256, 256))
-    
-    # visualise features
-    for i, data in enumerate(testloader, 0):
-        inputs, labels = data
+
+    # # visualise features
+    # for i, data in enumerate(testloader, 0):
+    #     inputs, labels = data
+    #     with torch.no_grad():
+    #         model.visualize_features(inputs.cuda())
+    #     break
+
+    # evaluate loss adn accuracy
+    criterion = nn.BCEWithLogitsLoss()
+    criterion = criterion.cuda()
+    activation = nn.Sigmoid()
+    activation = activation.cuda()
+    loss = 0
+    acc = 0
+    for inputs, labels in tqdm(testloader):
+        inputs, labels = inputs.cuda(), labels.cuda()
         with torch.no_grad():
-            model.visualize_features(inputs.cuda())
-        break
-    
+            output_val = model(inputs)
+        loss += criterion(output_val, labels)
+
+        output_val = activation(output_val)
+        acc += accuracy(output_val[0], labels[0])
+    loss = loss / test_images.shape[0]
+    acc = acc / test_images.shape[0]
+    print('loss :', loss, '\t', 'acc :', acc)
+
     # visualise sample test data
     show_predictions(testloader, 5)

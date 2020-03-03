@@ -13,7 +13,7 @@ print('Torch', torch.__version__, 'CUDA', torch.version.cuda)
 print('Device:', torch.device('cuda:0'), torch.cuda.get_device_name(0))
 
 PATH = 'my_model_u.pt'  # path of saved model
-threshold = 0.9         # threshold for a pixel to be considered an edge
+threshold = 0.5        # threshold for a pixel to be considered an edge
 
 # convert image to input for model
 img_transform = T.Compose([

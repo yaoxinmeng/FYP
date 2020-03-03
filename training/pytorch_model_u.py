@@ -22,10 +22,10 @@ if args.mode == 'test':
     print('TESTING MODEL...')
 
 # global variables
-filename = 'output_ori.hdf5'    # data array
-BATCH_SIZE = 2              # batch size
+filename = 'output.hdf5'    # data array
+BATCH_SIZE = 1              # batch size
 n_epochs = 50               # number of epochs
-PATH = 'my_model_u2.pt'      # path of saved model
+PATH = 'my_model_u.pt'      # path of saved model
 FIG_NAME = 'u_loss.png'     # name of figure plot
 
 
@@ -212,7 +212,7 @@ def accuracy(pred, true):
     for x in range(256):
         for y in range(256):
             sum += abs(pred[x][y] - true[x][y])
-    return sum/(256*256)
+    return 1 - sum/(256*256)
 
 
 # Train mode
@@ -324,7 +324,7 @@ if args.mode == 'test':
 
     # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
+    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
     # Load model
     model = Net()
@@ -333,12 +333,31 @@ if args.mode == 'test':
     model.eval()
     summary(model, (3, 256, 256))
 
-    # visualise features
-    for i, data in enumerate(testloader, 0):
-        inputs, labels = data
+    # # visualise features
+    # for i, data in enumerate(testloader, 0):
+    #     inputs, labels = data
+    #     with torch.no_grad():
+    #         model.visualize_features(inputs.cuda())
+    #     break
+
+    # evaluate loss adn accuracy
+    criterion = nn.BCEWithLogitsLoss()
+    criterion = criterion.cuda()
+    activation = nn.Sigmoid()
+    activation = activation.cuda()
+    loss = 0
+    acc = 0
+    for inputs, labels in tqdm(testloader):
+        inputs, labels = inputs.cuda(), labels.cuda()
         with torch.no_grad():
-            model.visualize_features(inputs.cuda())
-        break
+            output_val = model(inputs)
+        loss += criterion(output_val, labels)
+
+        output_val = activation(output_val)
+        acc += accuracy(output_val[0], labels[0])
+    loss = loss / test_images.shape[0]
+    acc = acc / test_images.shape[0]
+    print('loss :', loss, '\t', 'acc :', acc)
 
     # visualise sample test data
     show_predictions(testloader, 5)

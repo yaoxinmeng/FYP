@@ -235,5 +235,24 @@ if args.mode == 'test':
     model = model.cuda()
     model.eval()
 
-    # visualise sample test data
-    show_predictions(testloader, 5)
+    # evaluate loss adn accuracy
+    criterion = nn.BCEWithLogitsLoss()
+    criterion = criterion.cuda()
+    activation = nn.Sigmoid()
+    activation = activation.cuda()
+    loss = 0
+    acc = 0
+    for inputs, labels in tqdm(testloader):
+        inputs, labels = inputs.cuda(), labels.cuda()
+        with torch.no_grad():
+            output_val = model(inputs)['out'].view(-1, dim, dim)
+        loss += criterion(output_val, labels)
+
+        output_val = activation(output_val)
+        acc += accuracy(output_val[0], labels[0])
+    loss = loss / test_images.shape[0]
+    acc = acc / test_images.shape[0]
+    print('loss :', loss, '\t', 'acc :', acc)
+
+    # # visualise sample test data
+    # show_predictions(testloader, 5)
