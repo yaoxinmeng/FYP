@@ -325,7 +325,7 @@ if args.mode == 'test':
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
 
-     # generate dataset
+    # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
     testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 

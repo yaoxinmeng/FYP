@@ -4,16 +4,17 @@ from tqdm import tqdm
 import argparse
 # PyTorch libraries and modules
 import torch
-from torch.autograd import Variable
 from torch import nn, optim
 from torchsummary import summary
 from PIL import Image
 import torchvision.transforms as T
+import cv2
 print('Torch', torch.__version__, 'CUDA', torch.version.cuda)
 print('Device:', torch.device('cuda:0'), torch.cuda.get_device_name(0))
 
-PATH = 'my_model_u.pt'  # path of saved model
-threshold = 0.5        # threshold for a pixel to be considered an edge
+PATH = 'my_model_u_1.pt'  # path of saved model
+threshold = 0.5             # threshold for a pixel to be considered an edge
+                            # black is <= threshold
 
 # convert image to input for model
 img_transform = T.Compose([
@@ -28,9 +29,9 @@ img_transform = T.Compose([
 def edit_label(label):
     for x in np.nditer(label, op_flags=['readwrite']):
         if x > threshold:
-            x[...] = 1
-        else:
             x[...] = 0
+        else:
+            x[...] = 1
     return label
 
 # encoder submodel definition
@@ -147,12 +148,29 @@ input = input[0].permute(1, 2, 0).cpu()
 mask = np.array(mask[0].cpu())
 mask = edit_label(mask)
 
+# Probabilistic Line Transform
+# dst: Output of the edge detector. It should be a grayscale image (although in fact it is a binary one)
+# lines: A vector that will store the parameters (xstart,ystart,xend,yend) of the detected lines
+# rho : The resolution of the parameter r in pixels. We use 1 pixel.
+# theta: The resolution of the parameter θ in radians. We use 1 degree (CV_PI/180)
+# threshold: The minimum number of intersections to "*detect*" a line
+# minLinLength: The minimum number of points that can form a line. Lines with less than this number of points are disregarded.
+# maxLineGap: The maximum gap between two points to be considered in the same line.
+mask = np.uint8(mask * 255)
+thin = cv2.ximgproc.thinning(mask)
+lines = cv2.HoughLinesP(thin, 1, np.pi/180, 0, 20, 0)
+# Draw the lines
+hough = np.zeros((256,256), dtype=np.uint8)
+for line in lines:
+    x1, y1, x2, y2 = line[0]
+    cv2.line(hough, (x1, y1), (x2, y2), (255,255,255), 1)
+
 # show results on screen
 plt.figure(figsize=(15, 15))
-title = ['Input Image', 'Normalised Image', 'Predicted Mask']
-display_list = [im, input, mask]
+title = ['Input Image', 'Normalised Image', 'Predicted Mask', 'Hough Transform']
+display_list = [im, input, mask, hough]
 for i in range(len(display_list)):
-    plt.subplot(1, len(display_list), i+1)
+    plt.subplot(2, 2, i+1)
     plt.title(title[i])
     plt.imshow(display_list[i])
     plt.axis('off')

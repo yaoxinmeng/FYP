@@ -118,7 +118,7 @@ def accuracy(pred, true):
     for x in range(dim):
         for y in range(dim):
             sum += abs(pred[x][y] - true[x][y])
-    return sum/(dim*dim)
+    return 1 - sum/(dim*dim)
 
 
 # Train mode
@@ -228,31 +228,31 @@ if args.mode == 'test':
 
     # generate dataset
     testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
+    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
     # Load model
     model.load_state_dict(torch.load(PATH))
     model = model.cuda()
     model.eval()
 
-    # evaluate loss adn accuracy
-    criterion = nn.BCEWithLogitsLoss()
-    criterion = criterion.cuda()
-    activation = nn.Sigmoid()
-    activation = activation.cuda()
-    loss = 0
-    acc = 0
-    for inputs, labels in tqdm(testloader):
-        inputs, labels = inputs.cuda(), labels.cuda()
-        with torch.no_grad():
-            output_val = model(inputs)['out'].view(-1, dim, dim)
-        loss += criterion(output_val, labels)
+    # # evaluate loss adn accuracy
+    # criterion = nn.BCEWithLogitsLoss()
+    # criterion = criterion.cuda()
+    # activation = nn.Sigmoid()
+    # activation = activation.cuda()
+    # loss = 0
+    # acc = 0
+    # for inputs, labels in tqdm(testloader):
+    #     inputs, labels = inputs.cuda(), labels.cuda()
+    #     with torch.no_grad():
+    #         output_val = model(inputs)['out'].view(-1, dim, dim)
+    #     loss += criterion(output_val, labels)
+    #
+    #     output_val = activation(output_val)
+    #     acc += accuracy(output_val[0], labels[0])
+    # loss = loss / test_images.shape[0]
+    # acc = acc / test_images.shape[0]
+    # print('loss :', loss, '\t', 'acc :', acc)
 
-        output_val = activation(output_val)
-        acc += accuracy(output_val[0], labels[0])
-    loss = loss / test_images.shape[0]
-    acc = acc / test_images.shape[0]
-    print('loss :', loss, '\t', 'acc :', acc)
-
-    # # visualise sample test data
-    # show_predictions(testloader, 5)
+    # visualise sample test data
+    show_predictions(testloader, 5)
