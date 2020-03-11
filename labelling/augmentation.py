@@ -1,6 +1,6 @@
-# Creates a train and test set of type uint8
-# x has shape (-1 x 256 x 256 x 3), range [0, 255], type uint8
-# y has shape (-1 x 256 x 256), range [0, 1], type uint8
+# Creates a train and test set from directory
+# x has shape (-1 x 256 x 256 x 3), range [0, 1], type float32
+# y has shape (-1 x 256 x 256), range [0, 1], type float32
 
 import cv2
 import os
@@ -41,7 +41,7 @@ for subdir, dirs, files in os.walk(data_path):
         length += 1
 
 # list of files
-data_list = np.zeros((4*length, 256, 256, 3), dtype='uint8')
+data_list = np.zeros((4*length, 256, 256, 3), dtype='float32')
 label_list = np.zeros((4*length, 256, 256), dtype='float32')
 
 # augment data and labels in directory
@@ -66,10 +66,10 @@ for subdir, dirs, files in os.walk(data_path):
         # flip + brighten image
         flipped_bright_data = cv2.convertScaleAbs(flipped_data, alpha=1, beta=50)
 
-        data_list[4*count] = data
-        data_list[4*count+1] = flipped_data
-        data_list[4*count+2] = bright_data
-        data_list[4*count+3] = flipped_bright_data
+        data_list[4*count] = data[:, :, ::-1].astype('float32')/255
+        data_list[4*count+1] = flipped_data[:, :, ::-1].astype('float32')/255
+        data_list[4*count+2] = bright_data[:, :, ::-1].astype('float32')/255
+        data_list[4*count+3] = flipped_bright_data[:, :, ::-1].astype('float32')/255
         label_list[4*count] = (label/255)
         label_list[4*count+1] = (flipped_label/255)
         label_list[4*count+2] = (label/255)
@@ -77,17 +77,16 @@ for subdir, dirs, files in os.walk(data_path):
 
         # # For debugging purposes
         # plt.subplot(2, 2, 1)
-        # plt.imshow(label_list[0])
-        # plt.show()
+        # plt.imshow(data_list[0])
         # plt.subplot(2, 2, 2)
-        # plt.imshow(label_list[1])
+        # plt.imshow(data_list[1])
         # plt.subplot(2, 2, 3)
         # plt.imshow(label_list[2])
         # plt.subplot(2, 2, 4)
         # plt.imshow(label_list[3])
+        # plt.show()
 
         count += 1
-
 print('Data', data_list.dtype, data_list.shape)
 print('Label', label_list.dtype, label_list.shape)
 
@@ -104,17 +103,32 @@ print(train_y.dtype, train_y.shape)
 print(test_x.dtype, test_x.shape)
 print(test_y.dtype, test_y.shape)
 
+# mean and standard deviation
+mean = np.zeros(3)
+for data in tqdm(train_x):
+    mean += np.mean(data, axis=(0,1))
+mean = mean / train_x.shape[0]
+print(mean)
+std = np.zeros(3)
+for data in tqdm(train_x):
+    std += np.power(np.mean(data, axis=(0,1))-mean, 2)
+std = np.sqrt(std / train_x.shape[0])
+print(std)
 
 # save
 print('Saving file...')
 # save as hdf5 file
 f = h5py.File(outfile, "w")
-print('Compressing train set...')
+print('Compressing train images...')
 train_images = f.create_dataset("train_images", data = train_x, compression="gzip")
+print('Compressing train labels...')
 train_labels = f.create_dataset("train_labels", data = train_y, compression="gzip")
-print('Compressing test set...')
+print('Compressing test images...')
 test_images = f.create_dataset("test_images", data = test_x, compression="gzip")
+print('Compressing test labels...')
 test_labels = f.create_dataset("test_labels", data = test_y, compression="gzip")
+mean = f.create_dataset("mean", data = mean, compression="gzip")
+std = f.create_dataset("std", data = std, compression="gzip")
 f.close()
 # save as npz file
 #np.savez(npzfile, train_images=train_x, train_labels=train_y, test_images=test_x, test_labels=test_y)

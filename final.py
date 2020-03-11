@@ -18,10 +18,9 @@ threshold = 0.5             # threshold for a pixel to be considered an edge
 
 # convert image to input for model
 img_transform = T.Compose([
-    T.Resize((256,256)),
     T.ToTensor(),
-    T.Normalize(mean = [0.485, 0.456, 0.406],
-                std = [0.229, 0.224, 0.225],
+    T.Normalize(mean = [0.658, 0.600, 0.541],
+                std = [0.136, 0.138, 0.150],
                 inplace = True)
     ])
 
@@ -134,17 +133,20 @@ summary(model, (3, 256, 256))
 parser = argparse.ArgumentParser()
 parser.add_argument('image_path', type=str, help='Path of image file')
 args = parser.parse_args()
-im = Image.open(args.image_path)
+im0 = cv2.imread(args.image_path)
+
+# resize and normalise image
+im = cv2.resize(im0, (256, 256))
+im = im[:, :, ::-1].astype('float32')/255
+input = img_transform(im).view(-1, 3, 256, 256)
 
 # run model
-input = img_transform(im).view(-1, 3, 256, 256)
 activation = nn.Sigmoid()
 with torch.no_grad():
     mask = model(input.cuda())
     mask = activation(mask)
 
 # Prepare data to be displayed
-input = input[0].permute(1, 2, 0).cpu()
 mask = np.array(mask[0].cpu())
 mask = edit_label(mask)
 
@@ -167,8 +169,8 @@ for line in lines:
 
 # show results on screen
 plt.figure(figsize=(15, 15))
-title = ['Input Image', 'Normalised Image', 'Predicted Mask', 'Hough Transform']
-display_list = [im, input, mask, hough]
+title = ['Input Image', 'Resized Image', 'Predicted Mask', 'Hough Transform']
+display_list = [im0, im, mask, hough]
 for i in range(len(display_list)):
     plt.subplot(2, 2, i+1)
     plt.title(title[i])

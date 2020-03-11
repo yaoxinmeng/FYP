@@ -24,7 +24,8 @@ if args.mode == 'test':
 # global variables
 filename = 'output.hdf5'    # data array
 BATCH_SIZE = 1              # batch size
-n_epochs = 50               # number of epochs
+n_epochs = 30               # number of epochs
+error_threshold = 0.0367    # threshold to stop training
 PATH = 'my_model_u.pt'      # path of saved model
 FIG_NAME = 'u_loss.png'     # name of figure plot
 
@@ -36,11 +37,11 @@ class Conv(nn.Module):
 
         self.conv = nn.Sequential(
             nn.Conv2d(C_in, C_out, kernel_size=3, stride=1, padding=1),
-            nn.Dropout2d(0.2),
+            nn.Dropout2d(0.3),
             nn.BatchNorm2d(C_out, track_running_stats=False),
             nn.LeakyReLU(),
             nn.Conv2d(C_out, C_out, kernel_size=3, stride=1, padding=1),
-            nn.Dropout2d(0.2),
+            nn.Dropout2d(0.3),
             nn.BatchNorm2d(C_out, track_running_stats=False),
             nn.LeakyReLU(),
         )
@@ -149,14 +150,14 @@ class Net(nn.Module):
 
 
 # Custom tensor dataset with support of transforms
-class CustomTensorDataset(torch.utils.data.Dataset):
-    def __init__(self, arrays):
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, arrays, mean, std):
         assert all(arrays[0].shape[0] == array.shape[0] for array in arrays)
         self.arrays = arrays
         self.image_trf = T.Compose([
             T.ToTensor(),
-            T.Normalize(mean = [0.485, 0.456, 0.406],
-                        std = [0.229, 0.224, 0.225],
+            T.Normalize(mean = mean,
+                        std = std,
                         inplace = True)
             ])
 
@@ -164,7 +165,7 @@ class CustomTensorDataset(torch.utils.data.Dataset):
         x = self.arrays[0][index]
         x = self.image_trf(x)
         y = self.arrays[1][index]
-        y = torch.from_numpy(y).view(256, 256).type(torch.float32)
+        y = torch.from_numpy(y).view(256, 256)
         return x, y
 
     def __len__(self):
@@ -191,9 +192,9 @@ def display(display_list):
 
 
 # show predictions from a dataset
-def show_predictions(dataset, num):
+def show_predictions(dataset, images, num):
     activation = nn.Sigmoid()
-    for i, data in enumerate(dataset, 0):
+    for i, data in enumerate(testloader, 0):
         if i >= num:
             break
         image, mask = data
@@ -202,9 +203,8 @@ def show_predictions(dataset, num):
             pred_mask = activation(pred_mask)
         pred_mask = pred_mask[0].cpu()
         mask = mask[0]
-        image = image[0]
         print(accuracy(pred_mask, mask))
-        display([image.permute(1, 2, 0), mask, pred_mask])
+        display([images[i], mask, pred_mask])
 
 
 def accuracy(pred, true):
@@ -227,12 +227,15 @@ if args.mode == 'train':
     test_images = np.array(f.get("test_images"))
     print('Unpacking test labels...')
     test_labels = np.array(f.get("test_labels"))
+    print('Unpacking mean and standard deviation...')
+    mean = np.array(f.get("mean"))
+    std = np.array(f.get("std"))
     print(train_images.dtype, train_images.shape)
     print(train_labels.dtype, train_labels.shape)
 
     # create dataset
-    trainset = CustomTensorDataset((train_images, train_labels))
-    testset = CustomTensorDataset((test_images, test_labels))
+    trainset = CustomDataset((train_images, train_labels), mean, std)
+    testset = CustomDataset((test_images, test_labels), mean, std)
 
     # # Visualize sample from dataset
     # x, y = trainset[0]
@@ -251,7 +254,7 @@ if args.mode == 'train':
     model = Net()
     model = model.cuda()
     # defining the optimizer
-    optimizer = optim.Adam(model.parameters(), lr=0.07)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     # defining the loss function
     criterion = nn.BCEWithLogitsLoss()
     criterion = criterion.cuda()
@@ -301,7 +304,11 @@ if args.mode == 'train':
         train_losses.append(loss_train)
         val_losses.append(loss_val)
         print('train_loss :', loss_train, '\t', 'val_loss :', loss_val)
-
+        
+        # # exit earlier if error threshold is met
+        # if loss_val < error_threshold:
+            # break
+            
     # save model
     print('Saving...')
     torch.save(model.state_dict(), PATH)
@@ -321,10 +328,13 @@ if args.mode == 'test':
     test_images = np.array(f.get("test_images"))
     print('Unpackaging test labels...')
     test_labels = np.array(f.get("test_labels"))
+    print('Unpacking mean and standard deviation...')
+    mean = np.array(f.get("mean"))
+    std = np.array(f.get("std"))
 
     # generate dataset
-    testset = CustomTensorDataset((test_images, test_labels))
-    testloader=torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
+    testset = CustomDataset((test_images, test_labels), mean, std)
+    testloader=torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE, shuffle=False)
 
     # Load model
     model = Net()
@@ -340,24 +350,24 @@ if args.mode == 'test':
     #         model.visualize_features(inputs.cuda())
     #     break
 
-    # evaluate loss adn accuracy
-    criterion = nn.BCEWithLogitsLoss()
-    criterion = criterion.cuda()
-    activation = nn.Sigmoid()
-    activation = activation.cuda()
-    loss = 0
-    acc = 0
-    for inputs, labels in tqdm(testloader):
-        inputs, labels = inputs.cuda(), labels.cuda()
-        with torch.no_grad():
-            output_val = model(inputs)
-        loss += criterion(output_val, labels)
+    # # evaluate loss adn accuracy
+    # criterion = nn.BCEWithLogitsLoss()
+    # criterion = criterion.cuda()
+    # activation = nn.Sigmoid()
+    # activation = activation.cuda()
+    # loss = 0
+    # acc = 0
+    # for inputs, labels in tqdm(testloader):
+        # inputs, labels = inputs.cuda(), labels.cuda()
+        # with torch.no_grad():
+            # output_val = model(inputs)
+        # loss += criterion(output_val, labels)
 
-        output_val = activation(output_val)
-        acc += accuracy(output_val[0], labels[0])
-    loss = loss / test_images.shape[0]
-    acc = acc / test_images.shape[0]
-    print('loss :', loss, '\t', 'acc :', acc)
+        # output_val = activation(output_val)
+        # acc += accuracy(output_val[0], labels[0])
+    # loss = loss / test_images.shape[0]
+    # acc = acc / test_images.shape[0]
+    # print('loss :', loss, '\t', 'acc :', acc)
 
     # visualise sample test data
-    show_predictions(testloader, 5)
+    show_predictions(testset, test_images, 5)
