@@ -12,7 +12,7 @@ import cv2
 print('Torch', torch.__version__, 'CUDA', torch.version.cuda)
 print('Device:', torch.device('cuda:0'), torch.cuda.get_device_name(0))
 
-PATH = 'my_model_u_1.pt'  # path of saved model
+PATH = 'my_model_u.pt'  # path of saved model
 threshold = 0.5             # threshold for a pixel to be considered an edge
                             # black is <= threshold
 
@@ -130,10 +130,14 @@ parser.add_argument('image_path', type=str, help='Path of image file')
 args = parser.parse_args()
 im0 = cv2.imread(args.image_path)
 
+# convert from BGR to RGB, get original image dimensions
+im0 = im0[:, :, ::-1].astype('float32')/255
+height0 = im0.shape[0]
+width0 = im0.shape[1]
+
 # resize and normalise image
 im = cv2.resize(im0, (256, 256))
-im = im[:, :, ::-1].astype('float32')/255
-input = img_transform(im)
+input = img_transform(im).view(-1,3,256,256)
 
 # run model
 activation = nn.Sigmoid()
@@ -144,6 +148,9 @@ with torch.no_grad():
 # Prepare data to be displayed
 mask = np.array(mask[0].cpu())
 mask = edit_label(mask)
+mask = np.uint8(mask * 255)
+thin = cv2.ximgproc.thinning(mask)
+thin = cv2.resize(thin, (width0, height0))
 
 # Probabilistic Line Transform
 # dst: Output of the edge detector. It should be a grayscale image (although in fact it is a binary one)
@@ -153,21 +160,19 @@ mask = edit_label(mask)
 # threshold: The minimum number of intersections to "*detect*" a line
 # minLinLength: The minimum number of points that can form a line. Lines with less than this number of points are disregarded.
 # maxLineGap: The maximum gap between two points to be considered in the same line.
-mask = np.uint8(mask * 255)
-thin = cv2.ximgproc.thinning(mask)
 lines = cv2.HoughLinesP(thin, 1, np.pi/180, 0, 20, 0)
 # Draw the lines
-hough = np.zeros((256,256), dtype=np.uint8)
+hough = np.zeros((height0, width0), dtype=np.uint8)
 for line in lines:
     x1, y1, x2, y2 = line[0]
     cv2.line(hough, (x1, y1), (x2, y2), (255,255,255), 1)
 
 # show results on screen
 plt.figure(figsize=(15, 15))
-title = ['Input Image', 'Resized Image', 'Predicted Mask', 'Hough Transform']
-display_list = [im0, im, mask, hough]
+title = ['Input Image', 'Resized Image', 'Predicted Mask', 'Thinned Mask', 'Hough Transform']
+display_list = [im0, im, mask, thin, hough]
 for i in range(len(display_list)):
-    plt.subplot(2, 2, i+1)
+    plt.subplot(3, 2, i+1)
     plt.title(title[i])
     plt.imshow(display_list[i])
     plt.axis('off')
