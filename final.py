@@ -17,12 +17,7 @@ threshold = 0.5             # threshold for a pixel to be considered an edge
                             # black is <= threshold
 
 # convert image to input for model
-img_transform = T.Compose([
-    T.ToTensor(),
-    T.Normalize(mean = [0.658, 0.600, 0.541],
-                std = [0.136, 0.138, 0.150],
-                inplace = True)
-    ])
+img_transform = T.ToTensor()
 
 # function to thicken lines
 def edit_label(label):
@@ -138,7 +133,7 @@ im0 = cv2.imread(args.image_path)
 # resize and normalise image
 im = cv2.resize(im0, (256, 256))
 im = im[:, :, ::-1].astype('float32')/255
-input = img_transform(im).view(-1, 3, 256, 256)
+input = img_transform(im)
 
 # run model
 activation = nn.Sigmoid()
