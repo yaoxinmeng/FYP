@@ -8,8 +8,9 @@ not been labelled and exists merely as a backup. Each image is 256 x 256 pixels.
 ## labelling
 This folder contains all the necessary tools and resources for generating the dataset. 
 ###### resize.py
-When starting from scratch, the first thing that needs to be done is to resize all the images in the cleaned_data folder and transfer them to a new local folder (also named cleaned_data for simplicity). This can be done by running the following line in command. 
+When starting from scratch, the first thing that needs to be done is to transfer all the images to a new local folder. In this code, each image is resized to 512 x 512 to make it easier to label, and each image is also labelled with a unique number. The new image is then saved to a local directory (also named cleaned_data for simplicity). To run the code, simply enter the following line in command. 
 ```
 python resize.py ../cleaned_data --out_dir cleaned_data
 ```
-
+###### label.py
+This code generates a GUI for users to label their own images. Each input image is automatically taken from 
