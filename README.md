@@ -17,13 +17,18 @@ This code generates a GUI for users to label their own images. Each input image 
 - Input image that is resized back to 256 x 256
 - Output "mask" that contains all the labelled lines
 - Backup copy of the input image (512 x 512)
+
 Note that the original image in the cleaned_data folder is automatically deleted once the labelling is done, hence the need for a backup copy. These outputs are stored in the labelled_data directory in the following three folders respectively:
 - data
 - label
 - history
+
 To run this code, simply enter the following line in command. 
 ```
 python label.py
 ```
-###### label.py
-This
+###### augmentation.py
+This code augments the dataset and enlarges the dataset by 4 times. This is done by flipping horizontally, brightening, and a combination of both. The output of this code is a HDF5 file that containes the compressed dataset. To run this code, simply enter the following line in command. 
+```
+python augmentation.py labelled_data
+```
