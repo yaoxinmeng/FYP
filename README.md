@@ -6,6 +6,10 @@ This project aims to determine the best deep learning model for the task of extr
 This folder contains over 5000 photographic images of rooms sourced from the LSUN Scene Classification Challenge. These images have 
 not been labelled and exists merely as a backup. Each image is 256 x 256 pixels.
 ## labelling
-This folder contains all the necessary tools and resources for labelling the data. 
+This folder contains all the necessary tools and resources for generating the dataset. 
 ###### resize.py
-When starting from scratch, the first thing that needs to be done is to resize all the images in the cleaned_data folder and transfer them to a new local folder. 
+When starting from scratch, the first thing that needs to be done is to resize all the images in the cleaned_data folder and transfer them to a new local folder (also named cleaned_data for simplicity). This can be done by running the following line in command. 
+```
+python resize.py ../cleaned_data --out_dir cleaned_data
+```
+
