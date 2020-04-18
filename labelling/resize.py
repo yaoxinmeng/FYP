@@ -2,13 +2,17 @@ from __future__ import print_function
 import argparse
 import cv2
 import os
+from tqdm import tqdm
 
 
 def resize_images(in_path, out_path):
-    count = 0
+    # makes a directory if out_path does not exist
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
 
+    count = 0
     for subdir, dirs, files in os.walk(in_path):
-        for file in files:
+        for file in tqdm(files):
             # get input image from path given
             file = os.path.join(in_path, file)
             in_img = cv2.imread(file)
