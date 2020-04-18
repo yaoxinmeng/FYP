@@ -42,3 +42,9 @@ The most successful model was discovered to be the U-Net model. For a given mode
 ```
 python pytorch_model_u.py train
 ```
+Note that the above code is computationally intensive and can run for over 24 hours, depending on the performance of the computer and the number of epochs run. It also requires a CUDA-enabled GPU. The output of this is a .pt file that contains the trained values of each parameter in the model, as well as a .png file that plots the training and validation losses against epochs. These parameter files follow a similar naming convention to the codes. 
+
+To test the performance of each model, simply run the following line in command (we use U-Net as an example).
+```
+python pytorch_model_u.py test
+```
