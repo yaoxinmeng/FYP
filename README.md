@@ -48,3 +48,12 @@ To test the performance of each model, simply run the following line in command 
 ```
 python pytorch_model_u.py test
 ```
+This creates an output mask for some test images from the test set.
+## documentation
+This folder contains all relevant documentation for the project, including minutes, briefings and the final report. It also contains some of the figures obtained throughout the course of the project. 
+## final
+This folder containes the final code that serves the purpose of the project - extracting the structural edges from an input image. The final code uses the U-Net architecture and also has some post-processing capabilities to further refine the output masks. There are also some sample images available in this folder for users to try out. The final code can be run by entering the following line in command.
+```
+python final.py image_name
+```
+image_name is the name of the image, for example "bedroom.jpg". 
